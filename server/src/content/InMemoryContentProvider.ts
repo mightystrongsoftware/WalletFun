@@ -4,6 +4,7 @@ import {
   CreateWalletPassInput,
   DeviceRegistration,
   PassUpdate,
+  UpdateWalletPassNameInput,
   WalletPass
 } from "./ContentProvider.js";
 
@@ -33,6 +34,25 @@ export class InMemoryContentProvider implements ContentProvider {
 
   async getPassBySerialNumber(serialNumber: string): Promise<WalletPass | null> {
     return [...this.passes.values()].find((pass) => pass.serialNumber === serialNumber) ?? null;
+  }
+
+  async updatePassName(passId: string, input: UpdateWalletPassNameInput): Promise<WalletPass> {
+    const pass = this.passes.get(passId);
+    if (!pass) {
+      throw new Error("Pass not found");
+    }
+
+    const updatedPass: WalletPass = {
+      ...pass,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      status: "updated",
+      updateMessage: `Name updated to ${input.firstName} ${input.lastName}`,
+      updatedAt: new Date().toISOString()
+    };
+
+    this.passes.set(passId, updatedPass);
+    return updatedPass;
   }
 
   async createPassUpdate(passId: string, message: string): Promise<PassUpdate> {
@@ -74,4 +94,3 @@ export class InMemoryContentProvider implements ContentProvider {
     ].join(":");
   }
 }
-

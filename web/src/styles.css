@@ -79,6 +79,12 @@ label {
   font-weight: 600;
 }
 
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 select,
 input {
   width: 100%;
@@ -136,5 +142,8 @@ th {
   .adminGrid {
     grid-template-columns: 1fr;
   }
-}
 
+  .fieldRow {
+    grid-template-columns: 1fr;
+  }
+}

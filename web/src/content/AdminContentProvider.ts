@@ -13,6 +13,6 @@ export interface WalletPass {
 
 export interface AdminContentProvider {
   listPasses(): Promise<WalletPass[]>;
+  updatePassName(passId: string, firstName: string, lastName: string): Promise<void>;
   createPassUpdate(passId: string, message: string): Promise<void>;
 }
-

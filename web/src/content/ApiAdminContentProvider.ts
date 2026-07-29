@@ -26,5 +26,16 @@ export class ApiAdminContentProvider implements AdminContentProvider {
       throw new Error("Could not create pass update");
     }
   }
-}
 
+  async updatePassName(passId: string, firstName: string, lastName: string): Promise<void> {
+    const response = await fetch(`${this.apiBaseUrl}/api/admin/passes/${passId}/name`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, lastName })
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not update pass holder name");
+    }
+  }
+}

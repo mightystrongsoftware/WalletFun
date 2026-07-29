@@ -6,6 +6,11 @@ const updateSchema = z.object({
   message: z.string().trim().min(1).max(240)
 });
 
+const updateNameSchema = z.object({
+  firstName: z.string().trim().min(1).max(80),
+  lastName: z.string().trim().min(1).max(80)
+});
+
 export function createAdminRoutes(contentProvider: ContentProvider): Router {
   const router = Router();
 
@@ -27,6 +32,15 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
     }
   });
 
+  router.patch("/passes/:passId/name", async (request, response, next) => {
+    try {
+      const input = updateNameSchema.parse(request.body);
+      const pass = await contentProvider.updatePassName(request.params.passId, input);
+      response.json({ pass });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
 }
-

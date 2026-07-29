@@ -32,12 +32,17 @@ export interface CreateWalletPassInput {
   serialNumber: string;
 }
 
+export interface UpdateWalletPassNameInput {
+  firstName: string;
+  lastName: string;
+}
+
 export interface ContentProvider {
   createPass(input: CreateWalletPassInput): Promise<WalletPass>;
   listPasses(): Promise<WalletPass[]>;
   getPassBySerialNumber(serialNumber: string): Promise<WalletPass | null>;
+  updatePassName(passId: string, input: UpdateWalletPassNameInput): Promise<WalletPass>;
   createPassUpdate(passId: string, message: string): Promise<PassUpdate>;
   registerDevice(registration: DeviceRegistration): Promise<void>;
   unregisterDevice(deviceLibraryIdentifier: string, passTypeIdentifier: string, serialNumber: string): Promise<void>;
 }
-

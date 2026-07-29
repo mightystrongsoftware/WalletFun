@@ -4,6 +4,7 @@ import {
   CreateWalletPassInput,
   DeviceRegistration,
   PassUpdate,
+  UpdateWalletPassNameInput,
   WalletPass
 } from "./ContentProvider.js";
 
@@ -63,6 +64,25 @@ export class SupabaseContentProvider implements ContentProvider {
 
     if (error) throw error;
     return data ? mapPassRow(data) : null;
+  }
+
+  async updatePassName(passId: string, input: UpdateWalletPassNameInput): Promise<WalletPass> {
+    const updateMessage = `Name updated to ${input.firstName} ${input.lastName}`;
+    const { data, error } = await this.client
+      .from("wallet_passes")
+      .update({
+        first_name: input.firstName,
+        last_name: input.lastName,
+        status: "updated",
+        update_message: updateMessage,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", passId)
+      .select()
+      .single<PassRow>();
+
+    if (error) throw error;
+    return mapPassRow(data);
   }
 
   async createPassUpdate(passId: string, message: string): Promise<PassUpdate> {
@@ -127,4 +147,3 @@ function mapPassRow(row: PassRow): WalletPass {
     updatedAt: row.updated_at
   };
 }
-
