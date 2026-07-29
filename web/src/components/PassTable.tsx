@@ -1,0 +1,79 @@
+import { useState } from "react";
+import { createAdminContentProvider } from "../content/createAdminContentProvider";
+import { WalletPass } from "../content/AdminContentProvider";
+
+interface PassTableProps {
+  passes: WalletPass[];
+}
+
+export function PassTable({ passes }: PassTableProps) {
+  const contentProvider = createAdminContentProvider();
+  const [message, setMessage] = useState("WalletFun pass updated");
+  const [currentPasses, setCurrentPasses] = useState(passes);
+  const [selectedPassId, setSelectedPassId] = useState<string | null>(passes[0]?.id ?? null);
+  const [isPending, setIsPending] = useState(false);
+
+  async function triggerUpdate() {
+    if (!selectedPassId) return;
+
+    setIsPending(true);
+    await contentProvider.createPassUpdate(selectedPassId, message);
+    setCurrentPasses(await contentProvider.listPasses());
+    setIsPending(false);
+  }
+
+  return (
+    <section className="adminGrid">
+      <div className="panel">
+        <h2>Pass Updates</h2>
+        <label>
+          Pass
+          <select value={selectedPassId ?? ""} onChange={(event) => setSelectedPassId(event.target.value || null)}>
+            {currentPasses.map((pass) => (
+              <option key={pass.id} value={pass.id}>
+                {pass.firstName} {pass.lastName} - {pass.serialNumber}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Message
+          <input value={message} onChange={(event) => setMessage(event.target.value)} />
+        </label>
+        <button onClick={triggerUpdate} disabled={!selectedPassId || isPending}>
+          Trigger Update
+        </button>
+      </div>
+
+      <div className="panel tablePanel">
+        <h2>Generated Passes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Serial</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {currentPasses.length === 0 ? (
+              <tr>
+                <td colSpan={4}>No passes have been generated yet.</td>
+              </tr>
+            ) : (
+              currentPasses.map((pass) => (
+                <tr key={pass.id}>
+                  <td>{pass.firstName} {pass.lastName}</td>
+                  <td>{pass.serialNumber}</td>
+                  <td>{pass.status}</td>
+                  <td>{new Date(pass.updatedAt).toLocaleString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

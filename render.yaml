@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: walletfun-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.1
+      - key: CONTENT_PROVIDER
+        value: supabase
+      - key: PUBLIC_API_BASE_URL
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APPLE_PASS_TYPE_IDENTIFIER
+        sync: false
+      - key: APPLE_TEAM_IDENTIFIER
+        sync: false
+      - key: APPLE_WWDR_CERT_PATH
+        sync: false
+      - key: APPLE_PASS_CERT_PATH
+        sync: false
+      - key: APPLE_PASS_CERT_PASSWORD
+        sync: false
+

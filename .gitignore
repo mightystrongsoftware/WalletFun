@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.p12
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.pkpass
+
+# Apple / Xcode
+build/
+DerivedData/
+Derived/
+*.xcworkspace
+*.xcodeproj
+*.xcuserstate
+xcuserdata/
+.tuist-bin/
+.build/
+
+# Next / Vercel
+.next/
+.vercel/
+out/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# macOS
+.DS_Store
