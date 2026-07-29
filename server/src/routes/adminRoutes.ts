@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { config } from "../config.js";
 import { ContentProvider } from "../content/ContentProvider.js";
 import { logInfo } from "../logger.js";
 import { PassPushNotificationService } from "../wallet/PassPushNotificationService.js";
@@ -20,6 +21,29 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
   router.get("/passes", async (_request, response, next) => {
     try {
       response.json({ passes: await contentProvider.listPasses() });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/passes/:passId/wallet-metadata", async (request, response, next) => {
+    try {
+      const pass = await contentProvider.getPassById(request.params.passId);
+      if (!pass) {
+        response.sendStatus(404);
+        return;
+      }
+
+      response.json({
+        passId: pass.id,
+        serialNumber: pass.serialNumber,
+        passTypeIdentifier: config.applePassTypeIdentifier,
+        teamIdentifierConfigured: Boolean(config.appleTeamIdentifier),
+        webServiceURL: `${config.publicApiBaseUrl}/v1`,
+        authenticationTokenConfigured: pass.id.length > 0,
+        authenticationTokenLength: pass.id.length,
+        updatedAt: pass.updatedAt
+      });
     } catch (error) {
       next(error);
     }

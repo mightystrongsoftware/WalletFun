@@ -14,6 +14,18 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
   const router = Router();
   const packageService = new WalletPassPackageService();
 
+  router.use((request, response, next) => {
+    response.on("finish", () => {
+      logInfo("wallet.web_service.request", {
+        method: request.method,
+        path: request.originalUrl,
+        statusCode: response.statusCode,
+        userAgent: request.get("User-Agent")
+      });
+    });
+    next();
+  });
+
   router.post("/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", async (request, response, next) => {
     try {
       const input = registrationSchema.parse(request.body);
@@ -199,6 +211,15 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
   router.post("/log", (request, response) => {
     logInfo("wallet.device_log", { body: request.body });
     response.sendStatus(200);
+  });
+
+  router.use((request, response) => {
+    logWarn("wallet.web_service.not_found", {
+      method: request.method,
+      path: request.originalUrl,
+      userAgent: request.get("User-Agent")
+    });
+    response.sendStatus(404);
   });
 
   return router;
