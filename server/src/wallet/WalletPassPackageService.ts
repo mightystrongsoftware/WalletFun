@@ -56,14 +56,16 @@ export class WalletPassPackageService {
           {
             key: "holder",
             label: "PASS HOLDER",
-            value: fullName
+            value: fullName,
+            changeMessage: "WalletFun pass holder updated to %@."
           }
         ],
         secondaryFields: [
           {
             key: "status",
             label: "STATUS",
-            value: pass.status.toUpperCase()
+            value: pass.status.toUpperCase(),
+            changeMessage: "WalletFun status changed to %@."
           }
         ],
         auxiliaryFields: [
@@ -77,7 +79,8 @@ export class WalletPassPackageService {
           {
             key: "updateMessage",
             label: "Latest Update",
-            value: pass.updateMessage ?? "No updates yet."
+            value: pass.updateMessage ?? "No updates yet.",
+            changeMessage: "WalletFun update: %@"
           }
         ]
       }
