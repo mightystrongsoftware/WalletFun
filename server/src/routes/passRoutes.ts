@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { ContentProvider } from "../content/ContentProvider.js";
 import { PassService } from "../wallet/passService.js";
+import { PassSigningConfigurationError, WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
 
 const createPassSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -11,6 +12,7 @@ const createPassSchema = z.object({
 export function createPassRoutes(contentProvider: ContentProvider): Router {
   const router = Router();
   const passService = new PassService(contentProvider);
+  const packageService = new WalletPassPackageService();
 
   router.post("/", async (request, response, next) => {
     try {
@@ -29,17 +31,28 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
         return;
       }
 
+      const packageBuffer = await packageService.createPackage(pass);
+
       response
-        .status(501)
-        .json({
-          message: "Pass package signing is not implemented yet. Keep Apple certificates outside Git and wire them in through environment-backed storage.",
-          serialNumber: pass.serialNumber
-        });
+        .status(200)
+        .set({
+          "Content-Type": "application/vnd.apple.pkpass",
+          "Content-Disposition": `attachment; filename="${pass.serialNumber}.pkpass"`,
+          "Content-Length": packageBuffer.byteLength.toString()
+        })
+        .send(packageBuffer);
     } catch (error) {
+      if (error instanceof PassSigningConfigurationError) {
+        response.status(503).json({
+          message: "Apple Wallet pass signing is not configured.",
+          detail: error.message
+        });
+        return;
+      }
+
       next(error);
     }
   });
 
   return router;
 }
-

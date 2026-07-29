@@ -38,13 +38,17 @@ SUPABASE_URL=<your-supabase-project-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 ```
 
-Apple Wallet values can stay empty until signed pass generation is implemented:
+Apple Wallet values can stay empty during early API/admin prototyping. Pass download endpoints return 503 until signing is configured:
 
 ```text
 APPLE_PASS_TYPE_IDENTIFIER=
 APPLE_TEAM_IDENTIFIER=
 APPLE_WWDR_CERT_PATH=
+APPLE_WWDR_CERT_PEM=
 APPLE_PASS_CERT_PATH=
+APPLE_PASS_CERT_PEM=
+APPLE_PASS_KEY_PATH=
+APPLE_PASS_KEY_PEM=
 APPLE_PASS_CERT_PASSWORD=
 ```
 
@@ -110,3 +114,33 @@ https://walletfun.onrender.com
 ```
 
 Update `iOS/Project.swift` if the API host changes, then run `tuist generate`.
+
+## Apple Wallet Pass Signing
+
+The API can generate `.pkpass` files from `GET /api/passes/:serialNumber/download` and `GET /v1/passes/:passTypeIdentifier/:serialNumber` after signing material is configured in Render.
+
+Required Render environment variables:
+
+```text
+APPLE_PASS_TYPE_IDENTIFIER=pass.<your-pass-type-id>
+APPLE_TEAM_IDENTIFIER=<your-apple-team-id>
+APPLE_PASS_CERT_PASSWORD=<private-key-passphrase-if-any>
+```
+
+Then provide either file paths mounted with Render Secret Files:
+
+```text
+APPLE_WWDR_CERT_PATH=/etc/secrets/wwdr.pem
+APPLE_PASS_CERT_PATH=/etc/secrets/pass-cert.pem
+APPLE_PASS_KEY_PATH=/etc/secrets/pass-key.pem
+```
+
+Or PEM contents as environment variables:
+
+```text
+APPLE_WWDR_CERT_PEM=<wwdr pem>
+APPLE_PASS_CERT_PEM=<pass certificate pem>
+APPLE_PASS_KEY_PEM=<pass private key pem>
+```
+
+Do not commit Apple certificates, private keys, pass signing passwords, or generated `.pkpass` files.

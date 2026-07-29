@@ -27,8 +27,15 @@ services:
         sync: false
       - key: APPLE_WWDR_CERT_PATH
         sync: false
+      - key: APPLE_WWDR_CERT_PEM
+        sync: false
       - key: APPLE_PASS_CERT_PATH
+        sync: false
+      - key: APPLE_PASS_CERT_PEM
+        sync: false
+      - key: APPLE_PASS_KEY_PATH
+        sync: false
+      - key: APPLE_PASS_KEY_PEM
         sync: false
       - key: APPLE_PASS_CERT_PASSWORD
         sync: false
-

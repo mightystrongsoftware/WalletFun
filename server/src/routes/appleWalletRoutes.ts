@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ContentProvider } from "../content/ContentProvider.js";
+import { PassSigningConfigurationError, WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
 
 const registrationSchema = z.object({
   pushToken: z.string().trim().min(1)
@@ -8,6 +9,7 @@ const registrationSchema = z.object({
 
 export function createAppleWalletRoutes(contentProvider: ContentProvider): Router {
   const router = Router();
+  const packageService = new WalletPassPackageService();
 
   router.post("/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", async (request, response, next) => {
     try {
@@ -46,15 +48,28 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
         return;
       }
 
-      response.status(501).json({
-        message: "Signed .pkpass generation is intentionally deferred until certificate storage is configured.",
-        serialNumber: pass.serialNumber
-      });
+      const packageBuffer = await packageService.createPackage(pass);
+
+      response
+        .status(200)
+        .set({
+          "Content-Type": "application/vnd.apple.pkpass",
+          "Content-Disposition": `attachment; filename="${pass.serialNumber}.pkpass"`,
+          "Content-Length": packageBuffer.byteLength.toString()
+        })
+        .send(packageBuffer);
     } catch (error) {
+      if (error instanceof PassSigningConfigurationError) {
+        response.status(503).json({
+          message: "Apple Wallet pass signing is not configured.",
+          detail: error.message
+        });
+        return;
+      }
+
       next(error);
     }
   });
 
   return router;
 }
-

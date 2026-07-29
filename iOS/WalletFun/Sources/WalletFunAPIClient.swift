@@ -1,4 +1,5 @@
 import Foundation
+import PassKit
 
 struct WalletFunAPIClient {
     private let baseURL: URL
@@ -21,6 +22,23 @@ struct WalletFunAPIClient {
 
         return try JSONDecoder().decode(CreatePassResponse.self, from: data)
     }
+
+    func downloadPass(from url: URL) async throws -> PKPass {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WalletFunAPIError.requestFailed
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            if let apiError = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+                throw WalletFunAPIError.serverMessage(apiError.message)
+            }
+
+            throw WalletFunAPIError.requestFailed
+        }
+
+        return try PKPass(data: data)
+    }
 }
 
 struct CreatePassRequest: Encodable {
@@ -36,8 +54,18 @@ struct CreatePassResponse: Decodable {
 
 enum WalletFunAPIError: LocalizedError {
     case requestFailed
+    case serverMessage(String)
 
     var errorDescription: String? {
-        "The WalletFun server returned an error."
+        switch self {
+        case .requestFailed:
+            "The WalletFun server returned an error."
+        case .serverMessage(let message):
+            message
+        }
     }
+}
+
+private struct APIErrorResponse: Decodable {
+    let message: String
 }

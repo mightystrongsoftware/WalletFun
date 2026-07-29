@@ -1,10 +1,12 @@
 import SwiftUI
+import PassKit
 
 struct CreatePassView: View {
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var statusMessage = ""
     @State private var isSubmitting = false
+    @State private var addPassSheet: AddPassSheet?
 
     let apiClient: WalletFunAPIClient
 
@@ -38,6 +40,9 @@ struct CreatePassView: View {
                 }
             }
             .navigationTitle("WalletFun")
+            .sheet(item: $addPassSheet) { sheet in
+                AddPassView(pass: sheet.pass)
+            }
         }
     }
 
@@ -47,7 +52,14 @@ struct CreatePassView: View {
 
         do {
             let response = try await apiClient.createPass(firstName: firstName, lastName: lastName)
-            statusMessage = "Pass \(response.serialNumber) created. Download URL: \(response.downloadUrl.absoluteString)"
+            let pass = try await apiClient.downloadPass(from: response.downloadUrl)
+
+            if PKAddPassesViewController.canAddPasses() {
+                addPassSheet = AddPassSheet(pass: pass)
+                statusMessage = "Pass \(response.serialNumber) is ready to add to Wallet."
+            } else {
+                statusMessage = "Pass \(response.serialNumber) was created, but this device cannot add Wallet passes."
+            }
         } catch {
             statusMessage = "Could not create pass: \(error.localizedDescription)"
         }
@@ -60,3 +72,17 @@ struct CreatePassView: View {
     CreatePassView(apiClient: WalletFunAPIClient())
 }
 
+private struct AddPassSheet: Identifiable {
+    let id = UUID()
+    let pass: PKPass
+}
+
+private struct AddPassView: UIViewControllerRepresentable {
+    let pass: PKPass
+
+    func makeUIViewController(context: Context) -> PKAddPassesViewController {
+        PKAddPassesViewController(pass: pass)!
+    }
+
+    func updateUIViewController(_ uiViewController: PKAddPassesViewController, context: Context) {}
+}
