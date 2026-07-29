@@ -64,9 +64,10 @@ export class PassPushNotificationService {
 
       const notification = new Notification();
       notification.topic = signingMaterial.passTypeIdentifier;
-      notification.rawPayload = {};
+      notification.contentAvailable = true;
       notification.expiry = Math.floor(Date.now() / 1000) + 3600;
-      notification.priority = 10;
+      notification.priority = 5;
+      notification.pushType = "background";
 
       const result = await provider.send(
         notification,
