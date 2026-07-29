@@ -29,6 +29,9 @@ xcuserdata/
 out/
 dist/
 
+# Supabase local state
+supabase/.temp/
+
 # Logs
 *.log
 npm-debug.log*

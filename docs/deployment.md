@@ -93,3 +93,10 @@ Deployments run on pushes to `main` and manual workflow dispatch. See `docs/ci-s
 ## Supabase
 
 Create a Supabase project and run `server/supabase-schema.sql` in the SQL editor. Use the project URL and service role key only in Render environment variables.
+
+The same schema is also available as a Supabase CLI migration:
+
+```sh
+supabase link --project-ref xidkemohkwtyasvorjtt
+supabase db push
+```
