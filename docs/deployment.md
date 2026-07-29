@@ -100,3 +100,13 @@ The same schema is also available as a Supabase CLI migration:
 supabase link --project-ref xidkemohkwtyasvorjtt
 supabase db push
 ```
+
+## iOS API URL
+
+The iOS app reads `WALLETFUN_API_BASE_URL` from its generated Info.plist. The checked-in prototype default is:
+
+```text
+https://walletfun.onrender.com
+```
+
+Update `iOS/Project.swift` if the API host changes, then run `tuist generate`.

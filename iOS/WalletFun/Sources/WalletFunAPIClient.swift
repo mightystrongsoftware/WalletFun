@@ -3,7 +3,7 @@ import Foundation
 struct WalletFunAPIClient {
     private let baseURL: URL
 
-    init(baseURL: URL = URL(string: "http://127.0.0.1:3000")!) {
+    init(baseURL: URL = AppConfiguration.walletFunAPIBaseURL) {
         self.baseURL = baseURL
     }
 
@@ -41,4 +41,3 @@ enum WalletFunAPIError: LocalizedError {
         "The WalletFun server returned an error."
     }
 }
-

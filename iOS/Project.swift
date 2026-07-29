@@ -12,6 +12,7 @@ let project = Project(
             deploymentTargets: .iOS("17.0"),
             infoPlist: .extendingDefault(with: [
                 "UILaunchScreen": [:],
+                "WALLETFUN_API_BASE_URL": "https://walletfun.onrender.com",
                 "NSAppTransportSecurity": [
                     "NSAllowsArbitraryLoads": false
                 ]
@@ -21,4 +22,3 @@ let project = Project(
         )
     ]
 )
-
