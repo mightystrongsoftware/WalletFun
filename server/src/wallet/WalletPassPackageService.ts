@@ -22,7 +22,7 @@ export class WalletPassPackageService {
         wwdr: signingConfig.wwdr,
         signerCert: signingConfig.signerCert,
         signerKey: signingConfig.signerKey,
-        signerKeyPassphrase: config.applePassCertPassword
+        ...(config.applePassCertPassword ? { signerKeyPassphrase: config.applePassCertPassword } : {})
       }
     );
 
@@ -111,14 +111,32 @@ interface SigningConfig {
 
 function readSecret(name: string, pemValue: string | undefined, filePath: string | undefined): Buffer {
   if (pemValue) {
-    return Buffer.from(pemValue.replace(/\\n/g, "\n"));
+    return Buffer.from(extractPemBlock(pemValue.replace(/\\n/g, "\n"), name));
   }
 
   if (filePath) {
-    return readFileSync(filePath);
+    return Buffer.from(extractPemBlock(readFileSync(filePath, "utf8"), name));
   }
 
   throw new PassSigningConfigurationError(`${name}_PEM or ${name}_PATH is required.`);
+}
+
+function extractPemBlock(value: string, name: string): string {
+  if (name.includes("KEY")) {
+    const keyMatch = value.match(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/);
+    if (keyMatch) {
+      return keyMatch[0];
+    }
+  }
+
+  if (name.includes("CERT")) {
+    const certificateMatch = value.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/);
+    if (certificateMatch) {
+      return certificateMatch[0];
+    }
+  }
+
+  return value;
 }
 
 function createSolidPng(width: number, height: number, red: number, green: number, blue: number): Buffer {
@@ -177,4 +195,3 @@ function crc32(buffer: Buffer): number {
 
   return (crc ^ 0xffffffff) >>> 0;
 }
-
