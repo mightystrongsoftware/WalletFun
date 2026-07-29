@@ -54,7 +54,16 @@ VITE_WALLETFUN_API_BASE_URL=https://<your-render-service>.onrender.com
 
 After the Vercel URL exists, update Render's `WEB_ORIGIN` to that URL and redeploy the API.
 
+## GitHub Actions
+
+CI runs on pull requests and pushes to `main` for:
+
+- `server`: install, typecheck, build, audit
+- `web`: install, build, audit
+- `iOS`: Tuist generate and unsigned Xcode build
+
+Deployments run on pushes to `main` and manual workflow dispatch. See `docs/ci-secrets.md` for the required GitHub secrets.
+
 ## Supabase
 
 Create a Supabase project and run `server/supabase-schema.sql` in the SQL editor. Use the project URL and service role key only in Render environment variables.
-
