@@ -2,6 +2,10 @@
 
 ## API on Render
 
+The repo supports two Render setup paths.
+
+### Blueprint Node service
+
 The root `render.yaml` defines one Node web service:
 
 - Service name: `walletfun-api`
@@ -11,6 +15,18 @@ The root `render.yaml` defines one Node web service:
 - Health check: `/health`
 
 Create a new Render Blueprint from the GitHub repo. Render will ask for values marked `sync: false`; set them in the Render dashboard, not in Git.
+
+### Existing Docker service
+
+If the Render service was created as Docker, keep it and use the root `Dockerfile`. It builds only `server/` and starts the Express API with `npm start`.
+
+Use these Docker settings:
+
+```text
+Dockerfile Path: ./Dockerfile
+Docker Build Context Directory: .
+Health Check Path: /health
+```
 
 Required production values:
 
