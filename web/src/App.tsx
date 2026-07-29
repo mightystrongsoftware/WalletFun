@@ -17,7 +17,7 @@ export function App() {
         setStatus("");
       })
       .catch(() => {
-        setStatus("Start the WalletFun server to load admin data.");
+        setStatus("Could not load WalletFun API data. Check the API URL and Render WEB_ORIGIN setting.");
       });
   }, []);
 
@@ -33,4 +33,3 @@ export function App() {
     </main>
   );
 }
-

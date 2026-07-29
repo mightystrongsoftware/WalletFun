@@ -10,7 +10,7 @@ import { createPassRoutes } from "./routes/passRoutes.js";
 const app = express();
 const contentProvider = createContentProvider();
 
-app.use(cors({ origin: config.webOrigin }));
+app.use(cors({ origin: config.webOrigins }));
 app.use(express.json());
 
 app.get("/health", (_request, response) => {
@@ -36,4 +36,3 @@ app.use(errorHandler);
 app.listen(config.port, () => {
   console.log(`WalletFun server listening on http://127.0.0.1:${config.port}`);
 });
-

@@ -33,7 +33,7 @@ Required production values:
 ```text
 CONTENT_PROVIDER=supabase
 PUBLIC_API_BASE_URL=https://<your-render-service>.onrender.com
-WEB_ORIGIN=https://<your-vercel-admin>.vercel.app
+WEB_ORIGIN=https://<your-vercel-admin>.vercel.app,http://127.0.0.1:3001
 SUPABASE_URL=<your-supabase-project-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 ```
