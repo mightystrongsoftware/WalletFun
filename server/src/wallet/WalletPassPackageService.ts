@@ -45,7 +45,7 @@ export class WalletPassPackageService {
       organizationName: "Mighty Strong LLC",
       description: "WalletFun pass",
       serialNumber: pass.serialNumber,
-      webServiceURL: `${config.publicApiBaseUrl}/v1`,
+      webServiceURL: config.publicApiBaseUrl,
       authenticationToken: pass.id,
       logoText: "WalletFun",
       foregroundColor: "rgb(255, 255, 255)",

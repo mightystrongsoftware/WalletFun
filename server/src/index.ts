@@ -19,6 +19,7 @@ app.get("/health", (_request, response) => {
 
 app.use("/api/passes", createPassRoutes(contentProvider));
 app.use("/api/admin", createAdminRoutes(contentProvider));
+app.use("/v1/v1", createAppleWalletRoutes(contentProvider));
 app.use("/v1", createAppleWalletRoutes(contentProvider));
 
 const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {

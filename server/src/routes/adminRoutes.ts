@@ -39,7 +39,7 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
         serialNumber: pass.serialNumber,
         passTypeIdentifier: config.applePassTypeIdentifier,
         teamIdentifierConfigured: Boolean(config.appleTeamIdentifier),
-        webServiceURL: `${config.publicApiBaseUrl}/v1`,
+        webServiceURL: config.publicApiBaseUrl,
         authenticationTokenConfigured: pass.id.length > 0,
         authenticationTokenLength: pass.id.length,
         updatedAt: pass.updatedAt
