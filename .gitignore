@@ -31,6 +31,7 @@ dist/
 
 # Supabase local state
 supabase/.temp/
+**/supabase/.temp/
 
 # Logs
 *.log
