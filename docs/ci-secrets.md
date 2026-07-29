@@ -19,6 +19,8 @@ gh secret set VERCEL_PROJECT_ID --body "<vercel-project-id>"
 gh secret set VITE_WALLETFUN_API_BASE_URL --body "https://<your-render-service>.onrender.com"
 ```
 
+You can get `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` after running `npx vercel link` in `web/`; they are written to `web/.vercel/project.json`. Keep `.vercel/` out of Git.
+
 The deploy workflow skips API or web deployment when the corresponding secrets are missing.
 
 ## Host-Level Environment Variables
@@ -36,4 +38,3 @@ SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
 ```
 
 Store `VITE_WALLETFUN_API_BASE_URL` in Vercel and GitHub Actions.
-

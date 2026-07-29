@@ -52,21 +52,31 @@ Do not commit Apple certificates, private keys, provisioning profiles, generated
 
 ## Web Admin on Vercel
 
-Create a Vercel project from the same GitHub repo and set the project root directory to `web`.
+Deploy the web admin with the Vercel CLI from the `web` directory. This does not require Vercel Git integration.
 
-Use:
+First link the local `web` folder to a Vercel project:
 
-```text
-Build Command: npm run build
-Output Directory: dist
-Install Command: npm ci
+```sh
+cd web
+npx vercel link
 ```
 
-Set this Vercel environment variable:
+Set the production environment variable in Vercel:
 
 ```text
 VITE_WALLETFUN_API_BASE_URL=https://<your-render-service>.onrender.com
 ```
+
+Then deploy:
+
+```sh
+npm ci
+npm run vercel:pull
+npm run vercel:build
+npm run vercel:deploy
+```
+
+The generated `.vercel/` directory stays local and ignored by Git. GitHub Actions deploys with the same CLI flow using `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets.
 
 After the Vercel URL exists, update Render's `WEB_ORIGIN` to that URL and redeploy the API.
 

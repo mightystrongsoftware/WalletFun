@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 3001",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 3001"
+    "preview": "vite preview --host 127.0.0.1 --port 3001",
+    "vercel:pull": "vercel pull --yes --environment=production",
+    "vercel:build": "vercel build --prod",
+    "vercel:deploy": "vercel deploy --prebuilt --prod"
   },
   "dependencies": {
     "react": "^19.2.8",
