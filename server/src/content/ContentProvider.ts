@@ -26,6 +26,11 @@ export interface DeviceRegistration {
   createdAt: string;
 }
 
+export interface UpdatedPassSerials {
+  serialNumbers: string[];
+  lastUpdated: string;
+}
+
 export interface CreateWalletPassInput {
   firstName: string;
   lastName: string;
@@ -40,9 +45,16 @@ export interface UpdateWalletPassNameInput {
 export interface ContentProvider {
   createPass(input: CreateWalletPassInput): Promise<WalletPass>;
   listPasses(): Promise<WalletPass[]>;
+  getPassById(passId: string): Promise<WalletPass | null>;
   getPassBySerialNumber(serialNumber: string): Promise<WalletPass | null>;
   updatePassName(passId: string, input: UpdateWalletPassNameInput): Promise<WalletPass>;
   createPassUpdate(passId: string, message: string): Promise<PassUpdate>;
   registerDevice(registration: DeviceRegistration): Promise<void>;
   unregisterDevice(deviceLibraryIdentifier: string, passTypeIdentifier: string, serialNumber: string): Promise<void>;
+  listDeviceRegistrationsForPass(passTypeIdentifier: string, serialNumber: string): Promise<DeviceRegistration[]>;
+  listUpdatedPassSerials(
+    deviceLibraryIdentifier: string,
+    passTypeIdentifier: string,
+    passesUpdatedSince?: string
+  ): Promise<UpdatedPassSerials | null>;
 }

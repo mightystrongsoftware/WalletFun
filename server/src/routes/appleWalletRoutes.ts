@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { ContentProvider } from "../content/ContentProvider.js";
-import { PassSigningConfigurationError, WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
+import { ContentProvider, WalletPass } from "../content/ContentProvider.js";
+import { config } from "../config.js";
+import { PassSigningConfigurationError } from "../wallet/AppleSigningMaterial.js";
+import { WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
 
 const registrationSchema = z.object({
   pushToken: z.string().trim().min(1)
@@ -14,6 +16,17 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
   router.post("/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", async (request, response, next) => {
     try {
       const input = registrationSchema.parse(request.body);
+      const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
+      if (!pass || request.params.passTypeIdentifier !== config.applePassTypeIdentifier) {
+        response.sendStatus(404);
+        return;
+      }
+
+      if (!isAuthorized(request.get("Authorization"), pass)) {
+        response.sendStatus(401);
+        return;
+      }
+
       await contentProvider.registerDevice({
         deviceLibraryIdentifier: request.params.deviceLibraryIdentifier,
         passTypeIdentifier: request.params.passTypeIdentifier,
@@ -29,6 +42,17 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
 
   router.delete("/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber", async (request, response, next) => {
     try {
+      const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
+      if (!pass || request.params.passTypeIdentifier !== config.applePassTypeIdentifier) {
+        response.sendStatus(404);
+        return;
+      }
+
+      if (!isAuthorized(request.get("Authorization"), pass)) {
+        response.sendStatus(401);
+        return;
+      }
+
       await contentProvider.unregisterDevice(
         request.params.deviceLibraryIdentifier,
         request.params.passTypeIdentifier,
@@ -40,11 +64,40 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
     }
   });
 
+  router.get("/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier", async (request, response, next) => {
+    try {
+      if (request.params.passTypeIdentifier !== config.applePassTypeIdentifier) {
+        response.sendStatus(404);
+        return;
+      }
+
+      const updates = await contentProvider.listUpdatedPassSerials(
+        request.params.deviceLibraryIdentifier,
+        request.params.passTypeIdentifier,
+        typeof request.query.passesUpdatedSince === "string" ? request.query.passesUpdatedSince : undefined
+      );
+
+      if (!updates) {
+        response.sendStatus(204);
+        return;
+      }
+
+      response.json(updates);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/passes/:passTypeIdentifier/:serialNumber", async (request, response, next) => {
     try {
       const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
-      if (!pass) {
+      if (!pass || request.params.passTypeIdentifier !== config.applePassTypeIdentifier) {
         response.sendStatus(404);
+        return;
+      }
+
+      if (!isAuthorized(request.get("Authorization"), pass)) {
+        response.sendStatus(401);
         return;
       }
 
@@ -71,5 +124,14 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
     }
   });
 
+  router.post("/log", (request, response) => {
+    console.info("Apple Wallet device log", request.body);
+    response.sendStatus(200);
+  });
+
   return router;
+}
+
+function isAuthorized(authorizationHeader: string | undefined, pass: WalletPass): boolean {
+  return authorizationHeader === `ApplePass ${pass.id}`;
 }

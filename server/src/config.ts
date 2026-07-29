@@ -20,5 +20,7 @@ export const config = {
   applePassCertPem: process.env.APPLE_PASS_CERT_PEM,
   applePassKeyPath: process.env.APPLE_PASS_KEY_PATH,
   applePassKeyPem: process.env.APPLE_PASS_KEY_PEM,
-  applePassCertPassword: process.env.APPLE_PASS_CERT_PASSWORD
+  applePassCertPassword: process.env.APPLE_PASS_CERT_PASSWORD,
+  applePushUpdatesEnabled: process.env.APPLE_PUSH_UPDATES_ENABLED !== "false",
+  appleApnsProduction: process.env.APPLE_APNS_PRODUCTION !== "false"
 };

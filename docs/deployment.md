@@ -50,6 +50,8 @@ APPLE_PASS_CERT_PEM=
 APPLE_PASS_KEY_PATH=
 APPLE_PASS_KEY_PEM=
 APPLE_PASS_CERT_PASSWORD=
+APPLE_PUSH_UPDATES_ENABLED=true
+APPLE_APNS_PRODUCTION=true
 ```
 
 Do not commit Apple certificates, private keys, provisioning profiles, generated `.pkpass` files, Supabase service keys, or `.env` files.
@@ -125,6 +127,8 @@ Required Render environment variables:
 APPLE_PASS_TYPE_IDENTIFIER=pass.<your-pass-type-id>
 APPLE_TEAM_IDENTIFIER=<your-apple-team-id>
 APPLE_PASS_CERT_PASSWORD=<private-key-passphrase-if-any>
+APPLE_PUSH_UPDATES_ENABLED=true
+APPLE_APNS_PRODUCTION=true
 ```
 
 Then provide either file paths mounted with Render Secret Files:
@@ -144,3 +148,5 @@ APPLE_PASS_KEY_PEM=<pass private key pem>
 ```
 
 Do not commit Apple certificates, private keys, pass signing passwords, or generated `.pkpass` files.
+
+Wallet pass updates use the same Pass Type ID certificate and key as pass signing. After an installed pass registers with the API, admin edits send an APNs push to that device token. Wallet then calls `/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier` to get changed serial numbers and downloads the updated pass from `/v1/passes/:passTypeIdentifier/:serialNumber`.

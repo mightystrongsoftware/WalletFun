@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import { PKPass } from "passkit-generator";
 import { config } from "../config.js";
 import { WalletPass } from "../content/ContentProvider.js";
+import { AppleSigningMaterial, PassSigningConfigurationError, readAppleSigningMaterial } from "./AppleSigningMaterial.js";
 
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -22,7 +22,7 @@ export class WalletPassPackageService {
         wwdr: signingConfig.wwdr,
         signerCert: signingConfig.signerCert,
         signerKey: signingConfig.signerKey,
-        ...(config.applePassCertPassword ? { signerKeyPassphrase: config.applePassCertPassword } : {})
+        ...(signingConfig.signerKeyPassphrase ? { signerKeyPassphrase: signingConfig.signerKeyPassphrase } : {})
       }
     );
 
@@ -35,7 +35,7 @@ export class WalletPassPackageService {
     return walletPass.getAsBuffer();
   }
 
-  private createPassJson(pass: WalletPass, signingConfig: SigningConfig) {
+  private createPassJson(pass: WalletPass, signingConfig: AppleSigningMaterial) {
     const fullName = `${pass.firstName} ${pass.lastName}`.trim();
 
     return {
@@ -84,59 +84,9 @@ export class WalletPassPackageService {
     };
   }
 
-  private getSigningConfig(): SigningConfig {
-    if (!config.applePassTypeIdentifier || !config.appleTeamIdentifier) {
-      throw new PassSigningConfigurationError("APPLE_PASS_TYPE_IDENTIFIER and APPLE_TEAM_IDENTIFIER are required.");
-    }
-
-    return {
-      passTypeIdentifier: config.applePassTypeIdentifier,
-      teamIdentifier: config.appleTeamIdentifier,
-      wwdr: readSecret("APPLE_WWDR_CERT", config.appleWwdrCertPem, config.appleWwdrCertPath),
-      signerCert: readSecret("APPLE_PASS_CERT", config.applePassCertPem, config.applePassCertPath),
-      signerKey: readSecret("APPLE_PASS_KEY", config.applePassKeyPem, config.applePassKeyPath)
-    };
+  private getSigningConfig(): AppleSigningMaterial {
+    return readAppleSigningMaterial();
   }
-}
-
-export class PassSigningConfigurationError extends Error {}
-
-interface SigningConfig {
-  passTypeIdentifier: string;
-  teamIdentifier: string;
-  wwdr: Buffer;
-  signerCert: Buffer;
-  signerKey: Buffer;
-}
-
-function readSecret(name: string, pemValue: string | undefined, filePath: string | undefined): Buffer {
-  if (pemValue) {
-    return Buffer.from(extractPemBlock(pemValue.replace(/\\n/g, "\n"), name));
-  }
-
-  if (filePath) {
-    return Buffer.from(extractPemBlock(readFileSync(filePath, "utf8"), name));
-  }
-
-  throw new PassSigningConfigurationError(`${name}_PEM or ${name}_PATH is required.`);
-}
-
-function extractPemBlock(value: string, name: string): string {
-  if (name.includes("KEY")) {
-    const keyMatch = value.match(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/);
-    if (keyMatch) {
-      return keyMatch[0];
-    }
-  }
-
-  if (name.includes("CERT")) {
-    const certificateMatch = value.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/);
-    if (certificateMatch) {
-      return certificateMatch[0];
-    }
-  }
-
-  return value;
 }
 
 function createSolidPng(width: number, height: number, red: number, green: number, blue: number): Buffer {

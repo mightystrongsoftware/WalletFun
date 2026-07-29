@@ -2,7 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { ContentProvider } from "../content/ContentProvider.js";
 import { PassService } from "../wallet/passService.js";
-import { PassSigningConfigurationError, WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
+import { PassSigningConfigurationError } from "../wallet/AppleSigningMaterial.js";
+import { WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
 
 const createPassSchema = z.object({
   firstName: z.string().trim().min(1).max(80),

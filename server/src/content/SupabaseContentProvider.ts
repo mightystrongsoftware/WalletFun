@@ -5,6 +5,7 @@ import {
   DeviceRegistration,
   PassUpdate,
   UpdateWalletPassNameInput,
+  UpdatedPassSerials,
   WalletPass
 } from "./ContentProvider.js";
 
@@ -53,6 +54,17 @@ export class SupabaseContentProvider implements ContentProvider {
 
     if (error) throw error;
     return data.map(mapPassRow);
+  }
+
+  async getPassById(passId: string): Promise<WalletPass | null> {
+    const { data, error } = await this.client
+      .from("wallet_passes")
+      .select()
+      .eq("id", passId)
+      .maybeSingle<PassRow>();
+
+    if (error) throw error;
+    return data ? mapPassRow(data) : null;
   }
 
   async getPassBySerialNumber(serialNumber: string): Promise<WalletPass | null> {
@@ -133,7 +145,69 @@ export class SupabaseContentProvider implements ContentProvider {
 
     if (error) throw error;
   }
+
+  async listDeviceRegistrationsForPass(passTypeIdentifier: string, serialNumber: string): Promise<DeviceRegistration[]> {
+    const { data, error } = await this.client
+      .from("device_registrations")
+      .select()
+      .eq("pass_type_identifier", passTypeIdentifier)
+      .eq("serial_number", serialNumber)
+      .returns<DeviceRegistrationRow[]>();
+
+    if (error) throw error;
+    return data.map(mapDeviceRegistrationRow);
+  }
+
+  async listUpdatedPassSerials(
+    deviceLibraryIdentifier: string,
+    passTypeIdentifier: string,
+    passesUpdatedSince?: string
+  ): Promise<UpdatedPassSerials | null> {
+    const { data: registrations, error: registrationsError } = await this.client
+      .from("device_registrations")
+      .select("serial_number")
+      .eq("device_library_identifier", deviceLibraryIdentifier)
+      .eq("pass_type_identifier", passTypeIdentifier)
+      .returns<Array<{ serial_number: string }>>();
+
+    if (registrationsError) throw registrationsError;
+
+    const serialNumbers = registrations.map((registration) => registration.serial_number);
+    if (serialNumbers.length === 0) {
+      return null;
+    }
+
+    let query = this.client
+      .from("wallet_passes")
+      .select()
+      .in("serial_number", serialNumbers)
+      .order("updated_at", { ascending: true });
+
+    if (passesUpdatedSince) {
+      query = query.gt("updated_at", passesUpdatedSince);
+    }
+
+    const { data: passes, error: passesError } = await query.returns<PassRow[]>();
+
+    if (passesError) throw passesError;
+    if (passes.length === 0) {
+      return null;
+    }
+
+    return {
+      serialNumbers: passes.map((pass) => pass.serial_number),
+      lastUpdated: passes[passes.length - 1].updated_at
+    };
+  }
 }
+
+type DeviceRegistrationRow = {
+  device_library_identifier: string;
+  pass_type_identifier: string;
+  serial_number: string;
+  push_token: string;
+  created_at: string;
+};
 
 function mapPassRow(row: PassRow): WalletPass {
   return {
@@ -145,5 +219,15 @@ function mapPassRow(row: PassRow): WalletPass {
     updateMessage: row.update_message ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at
+  };
+}
+
+function mapDeviceRegistrationRow(row: DeviceRegistrationRow): DeviceRegistration {
+  return {
+    deviceLibraryIdentifier: row.device_library_identifier,
+    passTypeIdentifier: row.pass_type_identifier,
+    serialNumber: row.serial_number,
+    pushToken: row.push_token,
+    createdAt: row.created_at
   };
 }
