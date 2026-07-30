@@ -18,7 +18,10 @@ let project = Project(
                 ]
             ]),
             sources: ["WalletFun/Sources/**"],
-            resources: ["WalletFun/Resources/**"]
+            resources: ["WalletFun/Resources/**"],
+            settings: .settings(base: [
+                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
+            ])
         )
     ]
 )
