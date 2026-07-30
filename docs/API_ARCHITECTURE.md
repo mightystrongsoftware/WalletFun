@@ -22,6 +22,110 @@ WalletFun has one public server backend. The iOS app, Web Admin, and Apple Walle
 | Apple Wallet compatibility | `/v1/v1` | `server/src/index.ts` | Temporary compatibility for passes that were generated with an old `webServiceURL` containing `/v1`. |
 | Apple ecosystem outbound | APNs | `server/src/wallet/PassPushNotificationService.ts` | Server sends pass update pushes to Apple APNs. This is outbound, not an inbound HTTP endpoint. |
 
+## Client-to-Endpoint Security Matrix
+
+| Client | Endpoint or Integration | Direction | Security Construct | Current State | Hardening Needed |
+| --- | --- | --- | --- | --- | --- |
+| iOS app | `POST /api/passes` | Client to server | Public HTTPS API with body validation. CORS does not protect native clients. | No user authentication. Input is validated with Zod. | Add app/user authentication before allowing real customer data, abuse-sensitive pass creation, or rate-sensitive operations. Add rate limiting. |
+| iOS app | `GET /api/passes/:serialNumber/download` | Client to server | Public HTTPS download URL. Pass package itself is Apple-signed. | No requester authentication. Any party with the serial number can request the `.pkpass`. | Add a short-lived download token or require authenticated app session. Avoid exposing predictable serials. |
+| Web Admin | `GET /api/admin/passes` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. | No real admin authentication in the API. CORS only limits normal browser calls from other origins. | Add admin auth, such as Supabase Auth, Vercel-protected admin auth, or server-validated JWT with role checks. |
+| Web Admin | `GET /api/admin/passes/:passId/wallet-metadata` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. Does not expose the pass auth token value. | Diagnostic endpoint has no server-side admin auth. | Put behind admin auth or remove before production if not needed. |
+| Web Admin | `PATCH /api/admin/passes/:passId/name` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
+| Web Admin | `POST /api/admin/passes/:passId/updates` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
+| Apple Wallet | `POST /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber` | Wallet to server | Apple Wallet pass web service auth: `Authorization: ApplePass <authenticationToken>`. Token is embedded inside the signed pass. | Validates pass exists, pass type matches configured Pass Type ID, and token equals the pass authentication token. | Use a random dedicated token separate from database id before production. Consider rotating/revoking tokens when passes are voided. |
+| Apple Wallet | `DELETE /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber` | Wallet to server | Same `ApplePass` authorization token as registration. | Validates pass exists, pass type matches, and token matches before deleting registration. | Same as registration. |
+| Apple Wallet | `GET /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier` | Wallet to server | Apple Wallet update polling endpoint. | Currently validates only Pass Type ID. Does not require `ApplePass` because this endpoint returns only serial numbers for that device library and pass type. | Confirm against Apple production expectations. Consider whether additional validation is possible without breaking Wallet behavior. |
+| Apple Wallet | `GET /v1/passes/:passTypeIdentifier/:serialNumber` | Wallet to server | `ApplePass` authorization token plus signed `.pkpass` response. | Validates pass exists, pass type matches, and token matches before serving updated pass. | Use a dedicated random pass auth token rather than the internal pass id. |
+| Apple Wallet | `POST /v1/log` | Wallet to server | Apple Wallet diagnostic callback. | Accepts logs without auth. Logs body for diagnostics. | Sanitize/limit logs. Consider disabling or rate limiting if abused. |
+| Apple Wallet legacy pass | `/v1/v1/*` compatibility routes | Wallet to server | Same security as `/v1/*`. | Mounted only to support passes generated with the earlier `webServiceURL` value. | Remove once old passes are gone or reissued. |
+| Server Backend | Supabase | Server to database | Supabase service role key stored in Render environment variables. | Service role key is not committed and is only used server-side. | Keep service role key out of web/iOS clients. Add RLS policies if clients ever access Supabase directly. Rotate key if exposed. |
+| Server Backend | APNs | Server to Apple | Apple Pass Type ID certificate/private key loaded from Render environment variables or secret files. APNs topic is the Pass Type ID. | Sends silent background APNs payload to registered Wallet push tokens. Certs and private keys are not committed. | Monitor APNs failures. Rotate certs before expiration. Keep private key out of source and client apps. |
+| Render | `GET /health` | Platform to server | Public health check endpoint. | Returns `{ "ok": true }`; no auth. | Keep response non-sensitive. |
+
+## Security Model by Client
+
+### iOS App
+
+The iOS app is currently treated as a public client. It calls `/api/passes` to create a pass and `/api/passes/:serialNumber/download` to download the signed `.pkpass`.
+
+Current security construct:
+
+- HTTPS transport through Render.
+- Zod validation for request bodies.
+- Apple pass package signing protects pass integrity after download.
+
+Current gap:
+
+- The API does not authenticate the app or the user.
+- The pass download URL is bearer-by-knowledge of the serial number.
+
+Production direction:
+
+- Add user/session authentication.
+- Add a short-lived download token or authenticated download endpoint.
+- Add rate limiting for pass creation.
+
+### Web Admin
+
+The Web Admin is a browser client deployed on Vercel. It calls `/api/admin/*` endpoints to list passes and trigger updates.
+
+Current security construct:
+
+- HTTPS transport.
+- CORS allows configured `WEB_ORIGIN` values.
+- Zod validation for mutation bodies.
+
+Current gap:
+
+- CORS is not authentication. Non-browser clients can still call the endpoints directly.
+- Admin mutation endpoints currently have no server-enforced identity or role check.
+
+Production direction:
+
+- Add admin authentication before production use.
+- Validate an admin JWT or signed session server-side.
+- Add audit logging for mutations.
+
+### Apple Wallet
+
+Apple Wallet calls the `/v1/*` web service endpoints from `passd` on device.
+
+Current security construct:
+
+- Pass-specific endpoints require `Authorization: ApplePass <authenticationToken>`.
+- The token is embedded in the signed pass.
+- The server validates Pass Type ID, serial number, and token before registration deletion or pass download.
+
+Current gap:
+
+- The token currently equals the internal pass id.
+
+Production direction:
+
+- Store a separate random authentication token for each pass.
+- Keep the token out of admin list responses.
+- Support pass voiding/revocation semantics.
+
+### Apple Ecosystem APIs
+
+The server talks outbound to APNs to wake Wallet when a pass changes.
+
+Current security construct:
+
+- APNs certificate authentication uses the Apple Pass Type ID certificate and private key.
+- Signing material is loaded from Render environment variables or secret files.
+- Push tokens are stored in Supabase and fingerprinted in logs.
+
+Current gap:
+
+- APNs cert rotation is manual.
+
+Production direction:
+
+- Track certificate expiration.
+- Add operational alerting around APNs failures.
+- Keep certificate/private key management outside Git.
+
 ## iOS-Facing Endpoints
 
 ### `POST /api/passes`
