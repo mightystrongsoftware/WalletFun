@@ -107,6 +107,8 @@ supabase link --project-ref xidkemohkwtyasvorjtt
 supabase db push
 ```
 
+Run migrations before deploying server code that depends on new columns. Existing Apple Wallet passes are preserved by the `apple_authentication_token` migration, which backfills existing rows to the previous pass id token while new passes receive a dedicated random token from the server.
+
 ## iOS API URL
 
 The iOS app reads `WALLETFUN_API_BASE_URL` from its generated Info.plist. The checked-in prototype default is:

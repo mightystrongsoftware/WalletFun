@@ -46,7 +46,7 @@ export class WalletPassPackageService {
       description: "WalletFun pass",
       serialNumber: pass.serialNumber,
       webServiceURL: config.publicApiBaseUrl,
-      authenticationToken: pass.id,
+      authenticationToken: pass.appleAuthenticationToken,
       logoText: "WalletFun",
       foregroundColor: "rgb(255, 255, 255)",
       backgroundColor: "rgb(15, 118, 110)",

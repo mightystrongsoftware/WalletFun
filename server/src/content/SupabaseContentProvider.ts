@@ -12,6 +12,7 @@ import {
 type PassRow = {
   id: string;
   serial_number: string;
+  apple_authentication_token?: string;
   first_name: string;
   last_name: string;
   status: WalletPass["status"];
@@ -34,6 +35,7 @@ export class SupabaseContentProvider implements ContentProvider {
       .from("wallet_passes")
       .insert({
         serial_number: input.serialNumber,
+        apple_authentication_token: input.appleAuthenticationToken,
         first_name: input.firstName,
         last_name: input.lastName,
         status: "created"
@@ -213,6 +215,7 @@ function mapPassRow(row: PassRow): WalletPass {
   return {
     id: row.id,
     serialNumber: row.serial_number,
+    appleAuthenticationToken: row.apple_authentication_token ?? row.id,
     firstName: row.first_name,
     lastName: row.last_name,
     status: row.status,

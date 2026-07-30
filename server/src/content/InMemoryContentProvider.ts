@@ -18,6 +18,7 @@ export class InMemoryContentProvider implements ContentProvider {
     const pass: WalletPass = {
       id: nanoid(),
       serialNumber: input.serialNumber,
+      appleAuthenticationToken: input.appleAuthenticationToken,
       firstName: input.firstName,
       lastName: input.lastName,
       status: "created",

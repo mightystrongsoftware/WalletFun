@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
-import { ContentProvider } from "../content/ContentProvider.js";
+import { ContentProvider, WalletPass } from "../content/ContentProvider.js";
 import { logInfo } from "../logger.js";
 import { PassPushNotificationService } from "../wallet/PassPushNotificationService.js";
 
@@ -20,7 +20,7 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
 
   router.get("/passes", async (_request, response, next) => {
     try {
-      response.json({ passes: await contentProvider.listPasses() });
+      response.json({ passes: (await contentProvider.listPasses()).map(toAdminPass) });
     } catch (error) {
       next(error);
     }
@@ -40,8 +40,8 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
         passTypeIdentifier: config.applePassTypeIdentifier,
         teamIdentifierConfigured: Boolean(config.appleTeamIdentifier),
         webServiceURL: config.publicApiBaseUrl,
-        authenticationTokenConfigured: pass.id.length > 0,
-        authenticationTokenLength: pass.id.length,
+        authenticationTokenConfigured: pass.appleAuthenticationToken.length > 0,
+        authenticationTokenLength: pass.appleAuthenticationToken.length,
         updatedAt: pass.updatedAt
       });
     } catch (error) {
@@ -75,11 +75,16 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
         updatedAt: pass.updatedAt,
         push
       });
-      response.json({ pass, push });
+      response.json({ pass: toAdminPass(pass), push });
     } catch (error) {
       next(error);
     }
   });
 
   return router;
+}
+
+function toAdminPass(pass: WalletPass): Omit<WalletPass, "appleAuthenticationToken"> {
+  const { appleAuthenticationToken: _appleAuthenticationToken, ...adminPass } = pass;
+  return adminPass;
 }

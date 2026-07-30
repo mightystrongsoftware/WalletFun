@@ -32,10 +32,10 @@ WalletFun has one public server backend. The iOS app, Web Admin, and Apple Walle
 | Web Admin | `GET /api/admin/passes/:passId/wallet-metadata` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. Does not expose the pass auth token value. | Diagnostic endpoint has no server-side admin auth. | Put behind admin auth or remove before production if not needed. |
 | Web Admin | `PATCH /api/admin/passes/:passId/name` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
 | Web Admin | `POST /api/admin/passes/:passId/updates` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
-| Apple Wallet | `POST /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber` | Wallet to server | Apple Wallet pass web service auth: `Authorization: ApplePass <authenticationToken>`. Token is embedded inside the signed pass. | Validates pass exists, pass type matches configured Pass Type ID, and token equals the pass authentication token. | Use a random dedicated token separate from database id before production. Consider rotating/revoking tokens when passes are voided. |
+| Apple Wallet | `POST /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber` | Wallet to server | Apple Wallet pass web service auth: `Authorization: ApplePass <authenticationToken>`. Token is embedded inside the signed pass. | Validates pass exists, pass type matches configured Pass Type ID, and token equals the pass authentication token. New passes use a dedicated 256-bit random token. | Consider rotating/revoking tokens when passes are voided. |
 | Apple Wallet | `DELETE /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber` | Wallet to server | Same `ApplePass` authorization token as registration. | Validates pass exists, pass type matches, and token matches before deleting registration. | Same as registration. |
 | Apple Wallet | `GET /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier` | Wallet to server | Apple Wallet update polling endpoint. | Currently validates only Pass Type ID. Does not require `ApplePass` because this endpoint returns only serial numbers for that device library and pass type. | Confirm against Apple production expectations. Consider whether additional validation is possible without breaking Wallet behavior. |
-| Apple Wallet | `GET /v1/passes/:passTypeIdentifier/:serialNumber` | Wallet to server | `ApplePass` authorization token plus signed `.pkpass` response. | Validates pass exists, pass type matches, and token matches before serving updated pass. | Use a dedicated random pass auth token rather than the internal pass id. |
+| Apple Wallet | `GET /v1/passes/:passTypeIdentifier/:serialNumber` | Wallet to server | `ApplePass` authorization token plus signed `.pkpass` response. | Validates pass exists, pass type matches, and token matches before serving updated pass. | Consider token rotation and pass revocation behavior. |
 | Apple Wallet | `POST /v1/log` | Wallet to server | Apple Wallet diagnostic callback. | Accepts logs without auth. Logs body for diagnostics. | Sanitize/limit logs. Consider disabling or rate limiting if abused. |
 | Apple Wallet legacy pass | `/v1/v1/*` compatibility routes | Wallet to server | Same security as `/v1/*`. | Mounted only to support passes generated with the earlier `webServiceURL` value. | Remove once old passes are gone or reissued. |
 | Server Backend | Supabase | Server to database | Supabase service role key stored in Render environment variables. | Service role key is not committed and is only used server-side. | Keep service role key out of web/iOS clients. Add RLS policies if clients ever access Supabase directly. Rotate key if exposed. |
@@ -96,13 +96,13 @@ Current security construct:
 - The token is embedded in the signed pass.
 - The server validates Pass Type ID, serial number, and token before registration deletion or pass download.
 
-Current gap:
+Current implementation:
 
-- The token currently equals the internal pass id.
+- New passes get a dedicated 256-bit random base64url token from `crypto.randomBytes(32)`.
+- Existing rows are backfilled to use the previous pass id value so already-installed passes remain valid after the migration.
 
 Production direction:
 
-- Store a separate random authentication token for each pass.
 - Keep the token out of admin list responses.
 - Support pass voiding/revocation semantics.
 
@@ -218,7 +218,7 @@ Response:
   "teamIdentifierConfigured": true,
   "webServiceURL": "https://walletfun.onrender.com",
   "authenticationTokenConfigured": true,
-  "authenticationTokenLength": 21,
+  "authenticationTokenLength": 43,
   "updatedAt": "2026-07-29T00:00:00.000Z"
 }
 ```
@@ -327,7 +327,7 @@ Authentication:
 Authorization: ApplePass <authenticationToken>
 ```
 
-- The `authenticationToken` is embedded in the signed pass and currently maps to the internal pass id.
+- The `authenticationToken` is embedded in the signed pass. New passes use a dedicated random token stored in `wallet_passes.apple_authentication_token`.
 
 ### `POST /v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier/:serialNumber`
 
@@ -530,9 +530,11 @@ Tables:
 - `pass_updates`
 - `device_registrations`
 
+`wallet_passes.apple_authentication_token` is the server-side copy of the Apple Wallet bearer token embedded in `pass.json`. It is used only for Apple Wallet web service authorization and should not be returned by admin list/update endpoints.
+
 ## Security Notes
 
 - Apple certificates, private keys, Supabase keys, `.env` files, and generated `.pkpass` files must not be committed.
 - Admin endpoints are currently intended for the private Web Admin deployment and should get explicit admin authentication before production use.
-- Wallet endpoints use pass-level `ApplePass` authorization tokens.
+- Wallet endpoints use pass-level `ApplePass` authorization tokens stored separately from the internal pass id for new passes.
 - Logs fingerprint push tokens instead of printing full tokens.

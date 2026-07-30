@@ -129,5 +129,5 @@ Current prototype security gaps are documented in [docs/API_ARCHITECTURE.md](doc
 
 - Add real admin authentication for `/api/admin/*`.
 - Add app/user authentication or short-lived download tokens for pass creation and download.
-- Use a dedicated random Wallet `authenticationToken` per pass instead of the internal pass id.
+- Rotate or revoke dedicated Wallet `authenticationToken` values when passes are voided or compromised.
 - Keep Apple signing material and Supabase service keys only in server-side deployment secrets.

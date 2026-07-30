@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { config } from "../config.js";
 import { ContentProvider, WalletPass } from "../content/ContentProvider.js";
+import { createAppleAuthenticationToken } from "./AppleAuthenticationToken.js";
 
 export interface CreatePassRequest {
   firstName: string;
@@ -20,7 +21,8 @@ export class PassService {
     const pass = await this.contentProvider.createPass({
       firstName: input.firstName,
       lastName: input.lastName,
-      serialNumber: `wf-${nanoid(12)}`
+      serialNumber: `wf-${nanoid(12)}`,
+      appleAuthenticationToken: createAppleAuthenticationToken()
     });
 
     return this.toCreatePassResponse(pass);
@@ -38,4 +40,3 @@ export class PassService {
     };
   }
 }
-

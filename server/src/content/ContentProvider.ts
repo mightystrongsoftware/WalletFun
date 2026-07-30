@@ -3,6 +3,7 @@ export type WalletPassStatus = "created" | "updated" | "voided";
 export interface WalletPass {
   id: string;
   serialNumber: string;
+  appleAuthenticationToken: string;
   firstName: string;
   lastName: string;
   status: WalletPassStatus;
@@ -35,6 +36,7 @@ export interface CreateWalletPassInput {
   firstName: string;
   lastName: string;
   serialNumber: string;
+  appleAuthenticationToken: string;
 }
 
 export interface UpdateWalletPassNameInput {

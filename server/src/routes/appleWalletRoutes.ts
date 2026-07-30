@@ -226,5 +226,5 @@ export function createAppleWalletRoutes(contentProvider: ContentProvider): Route
 }
 
 function isAuthorized(authorizationHeader: string | undefined, pass: WalletPass): boolean {
-  return authorizationHeader === `ApplePass ${pass.id}`;
+  return authorizationHeader === `ApplePass ${pass.appleAuthenticationToken}`;
 }

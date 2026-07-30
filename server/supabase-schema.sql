@@ -1,6 +1,7 @@
 create table if not exists wallet_passes (
   id uuid primary key default gen_random_uuid(),
   serial_number text not null unique,
+  apple_authentication_token text not null unique,
   first_name text not null,
   last_name text not null,
   status text not null check (status in ('created', 'updated', 'voided')),
@@ -24,4 +25,3 @@ create table if not exists device_registrations (
   created_at timestamptz not null default now(),
   primary key (device_library_identifier, pass_type_identifier, serial_number)
 );
-
