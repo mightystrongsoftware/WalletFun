@@ -19,8 +19,13 @@ let project = Project(
             ]),
             sources: ["WalletFun/Sources/**"],
             resources: ["WalletFun/Resources/**"],
+            entitlements: .dictionary([
+                "com.apple.developer.pass-type-identifiers": ["$(TeamIdentifierPrefix)pass.mightystrong.walletfun"]
+            ]),
             settings: .settings(base: [
-                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
+                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+                "DEVELOPMENT_TEAM": "Q7BEAG244J",
+                "CODE_SIGN_STYLE": "Automatic"
             ])
         )
     ]

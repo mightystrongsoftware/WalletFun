@@ -4,9 +4,16 @@ import PassKit
 struct CreatePassView: View {
     @State private var firstName = ""
     @State private var lastName = ""
+    @State private var serialNumber = ""
     @State private var statusMessage = ""
     @State private var isSubmitting = false
-    @State private var addPassSheet: AddPassSheet?
+    @State private var createdPass: CreatePassResponse?
+    @State private var installedPasses: [PKPass] = []
+    @Environment(\.openURL) private var openURL
+
+    // Kept alive for the life of the view: PassKit only posts
+    // PKPassLibraryDidChange to apps holding a PKPassLibrary instance.
+    private let passLibrary = PKPassLibrary()
 
     let apiClient: WalletFunAPIClient
 
@@ -18,6 +25,14 @@ struct CreatePassView: View {
                         .textContentType(.givenName)
                     TextField("Last name", text: $lastName)
                         .textContentType(.familyName)
+                }
+
+                Section {
+                    TextField("Serial number (optional)", text: $serialNumber)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                } footer: {
+                    Text("Leave empty to create a new pass. Use an existing serial number to update that pass instead.")
                 }
 
                 Section {
@@ -38,12 +53,70 @@ struct CreatePassView: View {
                         Text(statusMessage)
                     }
                 }
+
+                if !installedPasses.isEmpty {
+                    Section("In your Wallet") {
+                        ForEach(installedPasses, id: \.serialNumber) { pass in
+                            HStack {
+                                Button {
+                                    if let passURL = pass.passURL {
+                                        openURL(passURL)
+                                    }
+                                } label: {
+                                    VStack(alignment: .leading) {
+                                        Text(pass.localizedName)
+                                        Text(pass.serialNumber)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .tint(.primary)
+
+                                Spacer()
+
+                                ShareLink(
+                                    item: shareItem(for: pass),
+                                    subject: Text("A WalletFun pass"),
+                                    message: Text("you might like this")
+                                ) {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
+                            }
+                            .buttonStyle(.borderless)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    passLibrary.removePass(pass)
+                                    refreshInstalledPasses()
+                                } label: {
+                                    Label("Remove from Wallet", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("WalletFun")
-            .sheet(item: $addPassSheet) { sheet in
-                AddPassView(pass: sheet.pass)
+            .sheet(item: $createdPass, onDismiss: refreshInstalledPasses) { response in
+                PassActionsView(response: response, apiClient: apiClient)
+            }
+            .onAppear(perform: refreshInstalledPasses)
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name(PKPassLibraryNotificationName.PKPassLibraryDidChange.rawValue))) { _ in
+                refreshInstalledPasses()
             }
         }
+    }
+
+    private func shareItem(for pass: PKPass) -> URL {
+        AppConfiguration.walletFunAPIBaseURL.appending(path: "/api/passes/\(pass.serialNumber)/download")
+    }
+
+    private func refreshInstalledPasses() {
+        guard PKPassLibrary.isPassLibraryAvailable() else { return }
+
+        // PKPassLibrary only returns passes whose pass type identifier is in
+        // the app's com.apple.developer.pass-type-identifiers entitlement.
+        installedPasses = passLibrary.passes()
+            .sorted { $0.serialNumber < $1.serialNumber }
     }
 
     private func createPass() async {
@@ -51,15 +124,17 @@ struct CreatePassView: View {
         statusMessage = ""
 
         do {
-            let response = try await apiClient.createPass(firstName: firstName, lastName: lastName)
-            let pass = try await apiClient.downloadPass(from: response.downloadUrl)
+            let requestedSerial = serialNumber.trimmingCharacters(in: .whitespaces)
+            let response = try await apiClient.createPass(
+                firstName: firstName,
+                lastName: lastName,
+                serialNumber: requestedSerial.isEmpty ? nil : requestedSerial
+            )
 
-            if PKAddPassesViewController.canAddPasses() {
-                addPassSheet = AddPassSheet(pass: pass)
-                statusMessage = "Pass \(response.serialNumber) is ready to add to Wallet."
-            } else {
-                statusMessage = "Pass \(response.serialNumber) was created, but this device cannot add Wallet passes."
-            }
+            createdPass = response
+            statusMessage = response.updated == true
+                ? "Pass \(response.serialNumber) was updated. Installed copies will refresh automatically."
+                : "Pass \(response.serialNumber) is ready."
         } catch {
             statusMessage = "Could not create pass: \(error.localizedDescription)"
         }
@@ -70,19 +145,4 @@ struct CreatePassView: View {
 
 #Preview {
     CreatePassView(apiClient: WalletFunAPIClient())
-}
-
-private struct AddPassSheet: Identifiable {
-    let id = UUID()
-    let pass: PKPass
-}
-
-private struct AddPassView: UIViewControllerRepresentable {
-    let pass: PKPass
-
-    func makeUIViewController(context: Context) -> PKAddPassesViewController {
-        PKAddPassesViewController(pass: pass)!
-    }
-
-    func updateUIViewController(_ uiViewController: PKAddPassesViewController, context: Context) {}
 }
