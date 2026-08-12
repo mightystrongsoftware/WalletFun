@@ -6,6 +6,7 @@ import { createAppleAuthenticationToken } from "./AppleAuthenticationToken.js";
 export interface CreatePassRequest {
   firstName: string;
   lastName: string;
+  serialNumber?: string;
 }
 
 export interface CreatePassResponse {
@@ -21,7 +22,7 @@ export class PassService {
     const pass = await this.contentProvider.createPass({
       firstName: input.firstName,
       lastName: input.lastName,
-      serialNumber: `wf-${nanoid(12)}`,
+      serialNumber: input.serialNumber ?? `wf-${nanoid(12)}`,
       appleAuthenticationToken: createAppleAuthenticationToken()
     });
 
