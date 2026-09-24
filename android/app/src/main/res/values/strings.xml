@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WalletFun</string>
+
+    <string name="section_pass_holder">Pass holder</string>
+    <string name="field_first_name">First name</string>
+    <string name="field_last_name">Last name</string>
+    <string name="field_serial_number">Serial number (optional)</string>
+    <string name="field_serial_number_footer">Leave empty to create a new pass. Use an existing serial number to update that pass instead.</string>
+    <string name="action_create_pass">Create WalletFun Pass</string>
+    <string name="section_status">Status</string>
+    <string name="section_in_your_wallet">Saved to Google Wallet</string>
+    <string name="section_in_your_wallet_footer">Google Wallet does not let apps list saved passes, so this shows passes added from this device.</string>
+    <string name="action_share">Share</string>
+    <string name="action_forget">Forget</string>
+    <string name="action_done">Done</string>
+
+    <string name="pass_created">Pass created</string>
+    <string name="pass_updated">Pass updated</string>
+    <string name="action_add_to_google_wallet">Add to Google Wallet</string>
+    <string name="action_share_pass">Share Pass</string>
+    <string name="share_subject">A WalletFun pass</string>
+    <string name="share_message">you might like this</string>
+
+    <string name="status_pass_ready">Pass %1$s is ready.</string>
+    <string name="status_pass_updated">Pass %1$s was updated. Saved copies will refresh automatically.</string>
+    <string name="status_create_failed">Could not create pass: %1$s</string>
+    <string name="status_added_to_wallet">Added to Google Wallet.</string>
+    <string name="status_add_canceled">Adding to Google Wallet was canceled.</string>
+    <string name="status_add_failed">Could not add pass to Google Wallet: %1$s</string>
+    <string name="status_wallet_unavailable">Google Wallet is not available on this device. Opened the save link in your browser instead.</string>
+    <string name="status_fetch_failed">Could not load Google Wallet pass: %1$s</string>
+    <string name="error_request_failed">The WalletFun server returned an error.</string>
+</resources>

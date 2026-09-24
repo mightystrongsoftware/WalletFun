@@ -7,6 +7,7 @@ server/node_modules
 web/node_modules
 
 iOS/Derived
+android/
 iOS/build
 iOS/*.xcodeproj
 iOS/*.xcworkspace

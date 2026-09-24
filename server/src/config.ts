@@ -22,5 +22,14 @@ export const config = {
   applePassKeyPem: process.env.APPLE_PASS_KEY_PEM,
   applePassCertPassword: process.env.APPLE_PASS_CERT_PASSWORD,
   applePushUpdatesEnabled: process.env.APPLE_PUSH_UPDATES_ENABLED !== "false",
-  appleApnsProduction: process.env.APPLE_APNS_PRODUCTION !== "false"
+  appleApnsProduction: process.env.APPLE_APNS_PRODUCTION !== "false",
+  googleWalletIssuerId: process.env.GOOGLE_WALLET_ISSUER_ID,
+  googleWalletClassSuffix: process.env.GOOGLE_WALLET_CLASS_SUFFIX ?? "walletfun",
+  googleServiceAccountJson: process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+  googleServiceAccountPath: process.env.GOOGLE_SERVICE_ACCOUNT_PATH,
+  googleWalletOrigins: (process.env.GOOGLE_WALLET_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  googleWalletUpdatesEnabled: process.env.GOOGLE_WALLET_UPDATES_ENABLED !== "false"
 };

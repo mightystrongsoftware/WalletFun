@@ -54,7 +54,18 @@ APPLE_PUSH_UPDATES_ENABLED=true
 APPLE_APNS_PRODUCTION=true
 ```
 
-Do not commit Apple certificates, private keys, provisioning profiles, generated `.pkpass` files, Supabase service keys, or `.env` files.
+Google Wallet values can also stay empty. The Google endpoints return 503 and wallet updates report `skippedReason` until an issuer and service account are configured:
+
+```text
+GOOGLE_WALLET_ISSUER_ID=
+GOOGLE_WALLET_CLASS_SUFFIX=walletfun
+GOOGLE_SERVICE_ACCOUNT_JSON=
+GOOGLE_SERVICE_ACCOUNT_PATH=
+GOOGLE_WALLET_ORIGINS=
+GOOGLE_WALLET_UPDATES_ENABLED=true
+```
+
+Do not commit Apple certificates, private keys, provisioning profiles, generated `.pkpass` files, Google service account keys, Supabase service keys, or `.env` files.
 
 ## Web Admin on Vercel
 
@@ -93,6 +104,7 @@ CI runs on pull requests and pushes to `main` for:
 - `server`: install, typecheck, build, audit
 - `web`: install, build, audit
 - `iOS`: Tuist generate and unsigned Xcode build
+- `android`: Gradle `assembleDebug` with Temurin JDK 17
 
 Deployments run on pushes to `main` and manual workflow dispatch. See `docs/ci-secrets.md` for the required GitHub secrets.
 
@@ -118,6 +130,19 @@ https://walletfun.onrender.com
 ```
 
 Update `iOS/Project.swift` if the API host changes, then run `tuist generate`.
+
+## Android API URL
+
+The Android app reads `WALLETFUN_API_BASE_URL` from `BuildConfig`, generated from the `walletFunApiBaseUrl` Gradle property in `android/gradle.properties`. The checked-in prototype default is the same Render URL.
+
+Override it per build without editing the file:
+
+```sh
+cd android
+./gradlew assembleDebug -PwalletFunApiBaseUrl=http://10.0.2.2:3000
+```
+
+Debug builds allow plain HTTP only to `10.0.2.2`, `127.0.0.1`, and `localhost` so an emulator can reach a local API. Release builds require HTTPS.
 
 ## Apple Wallet Pass Signing
 
@@ -152,3 +177,41 @@ APPLE_PASS_KEY_PEM=<pass private key pem>
 Do not commit Apple certificates, private keys, pass signing passwords, or generated `.pkpass` files.
 
 Wallet pass updates use the same Pass Type ID certificate and key as pass signing. After an installed pass registers with the API, admin edits send an APNs push to that device token. Wallet then calls `/v1/devices/:deviceLibraryIdentifier/registrations/:passTypeIdentifier` to get changed serial numbers and downloads the updated pass from `/v1/passes/:passTypeIdentifier/:serialNumber`.
+
+## Google Wallet Issuer Setup
+
+The API can return Save to Google Wallet JWTs from `GET /api/passes/:serialNumber/google-wallet` and push object updates after a Google Wallet issuer is configured in Render.
+
+One-time setup in Google Cloud and the Google Pay & Wallet Console:
+
+1. Create a Google Cloud project and enable the Google Wallet API.
+2. Create a service account in that project and download a JSON key.
+3. In the Google Pay & Wallet Console, create (or open) the issuer account and note the numeric Issuer ID.
+4. Under the issuer's Users, add the service account email with Developer access so it can create classes and objects.
+5. Until Google approves the issuer for production, only test accounts listed in the console can save passes.
+
+Required Render environment variables:
+
+```text
+GOOGLE_WALLET_ISSUER_ID=<numeric issuer id>
+GOOGLE_WALLET_CLASS_SUFFIX=walletfun
+GOOGLE_WALLET_UPDATES_ENABLED=true
+```
+
+Then provide the service account key either as a Render Secret File:
+
+```text
+GOOGLE_SERVICE_ACCOUNT_PATH=/etc/secrets/google-wallet-service-account.json
+```
+
+Or as the JSON contents in an environment variable:
+
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...","...":"..."}
+```
+
+`GOOGLE_WALLET_ORIGINS` is only needed if the save link is embedded on a web page; leave it empty for the Android app and shared links.
+
+The server creates the generic pass class `<issuerId>.<GOOGLE_WALLET_CLASS_SUFFIX>` automatically on first use. Each pass becomes the generic object `<issuerId>.<serialNumber>`. Admin edits patch that object and post a Wallet message; Google syncs the change to every device holding the pass, so no push token or device registration is stored for Google Wallet.
+
+Do not commit the service account JSON key.

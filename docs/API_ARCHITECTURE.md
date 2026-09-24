@@ -1,26 +1,31 @@
 # WalletFun API Architecture
 
-WalletFun has one public server backend. The iOS app, Web Admin, and Apple Wallet all talk to the Render-hosted Node API. The API owns persistence through the `ContentProvider` abstraction and currently stores data in Supabase.
+WalletFun has one public server backend. The iOS app, Android app, Web Admin, and Apple Wallet all talk to the Render-hosted Node API. The API owns persistence through the `ContentProvider` abstraction and currently stores data in Supabase. Google Wallet never calls the API; the server talks outbound to the Google Wallet Objects API instead.
 
 ## Surfaces
 
 | Surface | Host | Purpose |
 | --- | --- | --- |
 | iOS app | Native app | Creates a WalletFun pass and presents the Apple add-pass UI. |
+| Android app | Native app | Creates a WalletFun pass, fetches a Save to Google Wallet JWT, and presents the Google Wallet add-pass sheet. |
 | Web Admin | Vercel | Lists passes and triggers pass updates. |
-| Server Backend | Render | Creates passes, signs `.pkpass` files, stores state, serves Wallet web service endpoints, and sends APNs update pushes. |
+| Server Backend | Render | Creates passes, signs `.pkpass` files, manages Google Wallet objects, stores state, serves Wallet web service endpoints, and pushes updates to both wallets. |
 | Apple Wallet | iOS system app | Registers installed passes for updates, polls changed serials, and downloads updated passes. |
 | Apple Ecosystem APIs | Apple APNs / PassKit | APNs wakes Wallet; PassKit/Wallet install and update signed passes. |
+| Google Wallet | Android system app | Saves passes from signed JWTs through Google Play services and receives object updates from Google. |
+| Google Ecosystem APIs | Wallet Objects API / Pay client | Server upserts classes and objects; Google syncs object changes to every wallet holding the pass. |
 
 ## Endpoint Groups
 
 | Audience | Prefix | Route Module | Notes |
 | --- | --- | --- | --- |
-| iOS-facing | `/api/passes` | `server/src/routes/passRoutes.ts` | Used by the WalletFun iOS app. |
+| iOS- and Android-facing | `/api/passes` | `server/src/routes/passRoutes.ts` | Pass creation shared by both apps. `/download` serves the Apple `.pkpass`; `/google-wallet` serves the Google save JWT. |
 | Admin-facing | `/api/admin` | `server/src/routes/adminRoutes.ts` | Used by the Vercel Web Admin. |
 | Apple Wallet-facing | `/v1` | `server/src/routes/appleWalletRoutes.ts` | Wallet web service endpoints called by `passd` on device. |
 | Apple Wallet compatibility | `/v1/v1` | `server/src/index.ts` | Temporary compatibility for passes that were generated with an old `webServiceURL` containing `/v1`. |
 | Apple ecosystem outbound | APNs | `server/src/wallet/PassPushNotificationService.ts` | Server sends pass update pushes to Apple APNs. This is outbound, not an inbound HTTP endpoint. |
+| Google ecosystem outbound | Wallet Objects API | `server/src/wallet/GoogleWalletPassService.ts` | Server creates the pass class, upserts generic objects, signs save JWTs, and patches objects on update. Outbound only. |
+| Both wallets | Fan-out | `server/src/wallet/WalletUpdateService.ts` | Runs the APNs push and the Google object patch for every pass change and reports both results. |
 
 ## Client-to-Endpoint Security Matrix
 
@@ -28,6 +33,9 @@ WalletFun has one public server backend. The iOS app, Web Admin, and Apple Walle
 | --- | --- | --- | --- | --- | --- |
 | iOS app | `POST /api/passes` | Client to server | Public HTTPS API with body validation. CORS does not protect native clients. | No user authentication. Input is validated with Zod. | Add app/user authentication before allowing real customer data, abuse-sensitive pass creation, or rate-sensitive operations. Add rate limiting. |
 | iOS app | `GET /api/passes/:serialNumber/download` | Client to server | Public HTTPS download URL. Pass package itself is Apple-signed. | No requester authentication. Any party with the serial number can request the `.pkpass`. | Add a short-lived download token or require authenticated app session. Avoid exposing predictable serials. |
+| Android app | `POST /api/passes` | Client to server | Same public endpoint and validation as the iOS app. | No user authentication. | Same as the iOS row. |
+| Android app | `GET /api/passes/:serialNumber/google-wallet` | Client to server | Public HTTPS endpoint. Returned JWT is RS256-signed by the Google service account and only references the object id. | No requester authentication. Any party with the serial number can obtain a save JWT and add the pass to their own Google Wallet. Google allows one save per object per account. | Add a short-lived token or authenticated app session. Consider `exp` on the JWT. |
+| Android app / share recipients | `GET /api/passes/:serialNumber/google-wallet/save` | Client to server | Public HTTPS redirect into `https://pay.google.com/gp/v/save/<jwt>`. | Bearer-by-knowledge of the serial number, same as the Apple download link. | Same as above. |
 | Web Admin | `GET /api/admin/passes` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. | No real admin authentication in the API. CORS only limits normal browser calls from other origins. | Add admin auth, such as Supabase Auth, Vercel-protected admin auth, or server-validated JWT with role checks. |
 | Web Admin | `GET /api/admin/passes/:passId/wallet-metadata` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. Does not expose the pass auth token value. | Diagnostic endpoint has no server-side admin auth. | Put behind admin auth or remove before production if not needed. |
 | Web Admin | `PATCH /api/admin/passes/:passId/name` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
@@ -40,6 +48,7 @@ WalletFun has one public server backend. The iOS app, Web Admin, and Apple Walle
 | Apple Wallet legacy pass | `/v1/v1/*` compatibility routes | Wallet to server | Same security as `/v1/*`. | Mounted only to support passes generated with the earlier `webServiceURL` value. | Remove once old passes are gone or reissued. |
 | Server Backend | Supabase | Server to database | Supabase service role key stored in Render environment variables. | Service role key is not committed and is only used server-side. | Keep service role key out of web/iOS clients. Add RLS policies if clients ever access Supabase directly. Rotate key if exposed. |
 | Server Backend | APNs | Server to Apple | Apple Pass Type ID certificate/private key loaded from Render environment variables or secret files. APNs topic is the Pass Type ID. | Sends silent background APNs payload to registered Wallet push tokens. Certs and private keys are not committed. | Monitor APNs failures. Rotate certs before expiration. Keep private key out of source and client apps. |
+| Server Backend | Google Wallet Objects API | Server to Google | Service account JSON key (`GOOGLE_SERVICE_ACCOUNT_JSON` or `_PATH`) with the `wallet_object.issuer` scope; the same key signs save JWTs. | Class and objects are created under the configured issuer id. The key is not committed. | Restrict the service account to the Wallet API. Rotate keys. Monitor `google_wallet.*` log events for API failures. |
 | Render | `GET /health` | Platform to server | Public health check endpoint. | Returns `{ "ok": true }`; no auth. | Keep response non-sensitive. |
 
 ## Security Model by Client
@@ -63,6 +72,27 @@ Production direction:
 
 - Add user/session authentication.
 - Add a short-lived download token or authenticated download endpoint.
+- Add rate limiting for pass creation.
+
+### Android App
+
+The Android app is treated the same way as the iOS app: a public client. It calls `/api/passes` to create a pass and `/api/passes/:serialNumber/google-wallet` to obtain the Save to Google Wallet JWT.
+
+Current security construct:
+
+- HTTPS transport through Render.
+- Zod validation for request bodies.
+- The save JWT is signed with the Google service account private key and references only the object id, so pass content cannot be tampered with client side.
+
+Current gap:
+
+- The API does not authenticate the app or the user.
+- Anyone with a serial number can request a save JWT.
+
+Production direction:
+
+- Add user/session authentication.
+- Add a short-lived token or authenticated endpoint for the save JWT and consider setting `exp` on the JWT.
 - Add rate limiting for pass creation.
 
 ### Web Admin
@@ -106,6 +136,20 @@ Production direction:
 - Keep the token out of admin list responses.
 - Support pass voiding/revocation semantics.
 
+### Google Wallet
+
+Google Wallet has no inbound web service contract. The server owns the pass as a Generic Object in the Wallet Objects API:
+
+- The object id is `<issuerId>.<serialNumber>`, so serial numbers must stay within `[A-Za-z0-9._-]`, which the create schema already enforces.
+- `GET /api/passes/:serialNumber/google-wallet` ensures the class exists, inserts or replaces the object with the current pass state, then signs a skinny JWT that references the object id.
+- Updates call `PATCH genericObject/<id>` and `addMessage` with `TEXT_AND_NOTIFY`, the closest analogue to Apple's `changeMessage`. Google caps notifications at three per object per day, so a failed message is logged but does not fail the update.
+- If the object was never created (pass never saved to Google Wallet), the update is skipped with `skippedReason`.
+
+Production direction:
+
+- Set `state: INACTIVE` or `EXPIRED` when passes are voided (the service already maps `voided` to `INACTIVE`).
+- Add `exp` to save JWTs and lock down who can request them.
+
 ### Apple Ecosystem APIs
 
 The server talks outbound to APNs to wake Wallet when a pass changes.
@@ -126,13 +170,13 @@ Production direction:
 - Add operational alerting around APNs failures.
 - Keep certificate/private key management outside Git.
 
-## iOS-Facing Endpoints
+## iOS- and Android-Facing Endpoints
 
 ### `POST /api/passes`
 
-Creates a WalletFun pass record.
+Creates a WalletFun pass record. Sending an existing `serialNumber` updates that pass instead and pushes the change to both wallets.
 
-Audience: iOS app.
+Audience: iOS app, Android app.
 
 Request body:
 
@@ -149,14 +193,23 @@ Response: `201 Created`
 {
   "id": "pass-record-id",
   "serialNumber": "wf-example",
-  "downloadUrl": "https://walletfun.onrender.com/api/passes/wf-example/download"
+  "downloadUrl": "https://walletfun.onrender.com/api/passes/wf-example/download",
+  "googleWalletUrl": "https://walletfun.onrender.com/api/passes/wf-example/google-wallet",
+  "googleWalletSaveUrl": "https://walletfun.onrender.com/api/passes/wf-example/google-wallet/save"
 }
 ```
+
+Response when an existing serial number was updated: `200 OK` with the same shape plus `"updated": true`.
 
 Persistence:
 
 - Inserts a row into `wallet_passes`.
 - Generates a unique serial number with the `wf-` prefix.
+
+Side effects (update case only):
+
+- Sends an APNs pass update push for each registered device token.
+- Patches the Google Wallet object if the pass was saved to Google Wallet.
 
 ### `GET /api/passes/:serialNumber/download`
 
@@ -174,6 +227,48 @@ Notes:
 
 - This endpoint is how the iOS app gets the pass before presenting `PKAddPassesViewController`.
 - The generated `pass.json` includes `webServiceURL`, `authenticationToken`, `passTypeIdentifier`, `teamIdentifier`, and field `changeMessage` values.
+
+### `GET /api/passes/:serialNumber/google-wallet`
+
+Returns the signed Save to Google Wallet JWT for a pass.
+
+Audience: Android app.
+
+Response:
+
+```json
+{
+  "objectId": "3388000000012345678.wf-example",
+  "saveJwt": "eyJhbGciOiJSUzI1NiIs...",
+  "saveUrl": "https://pay.google.com/gp/v/save/eyJhbGciOiJSUzI1NiIs..."
+}
+```
+
+- `200 OK` with `Cache-Control: no-store`
+- `404 Not Found` when the serial number does not exist
+- `503 Service Unavailable` when Google Wallet is not configured
+
+Side effects:
+
+- Creates the generic class `<issuerId>.<GOOGLE_WALLET_CLASS_SUFFIX>` on first use.
+- Inserts or replaces the generic object `<issuerId>.<serialNumber>` with the current holder name, status, serial, and latest update message.
+
+Notes:
+
+- The Android app passes `saveJwt` to `PayClient.savePassesJwt`, the Google counterpart of `PKAddPassesViewController`.
+- `saveUrl` is the browser fallback for devices without Google Wallet.
+
+### `GET /api/passes/:serialNumber/google-wallet/save`
+
+Redirects (`302`) to the `pay.google.com` save link for a pass. This is the link the Android app shares, mirroring how the iOS app shares the `.pkpass` download URL.
+
+Audience: Android app share recipients.
+
+Response:
+
+- `302 Found` to `https://pay.google.com/gp/v/save/<jwt>`
+- `404 Not Found` when the serial number does not exist
+- `503 Service Unavailable` when Google Wallet is not configured
 
 ## Admin-Facing Endpoints
 
@@ -219,6 +314,12 @@ Response:
   "webServiceURL": "https://walletfun.onrender.com",
   "authenticationTokenConfigured": true,
   "authenticationTokenLength": 43,
+  "googleWallet": {
+    "configured": true,
+    "issuerId": "3388000000012345678",
+    "classId": "3388000000012345678.walletfun",
+    "objectId": "3388000000012345678.wf-example"
+  },
   "updatedAt": "2026-07-29T00:00:00.000Z"
 }
 ```
@@ -226,6 +327,7 @@ Response:
 Notes:
 
 - This does not expose the pass authentication token value.
+- `googleWallet.configured` is `false` with a `detail` message when the Google issuer or service account is missing.
 - Use this when Wallet does not register for updates.
 
 ### `PATCH /api/admin/passes/:passId/name`
@@ -261,9 +363,17 @@ Response:
     "attempted": true,
     "sent": 1,
     "failed": 0
+  },
+  "googleWallet": {
+    "attempted": false,
+    "sent": 0,
+    "failed": 0,
+    "skippedReason": "Pass has not been saved to Google Wallet."
   }
 }
 ```
+
+`push` is the Apple APNs result; `googleWallet` is the Google Wallet object patch result. Both use the same `attempted`, `sent`, `failed`, and optional `skippedReason` shape.
 
 Persistence:
 
@@ -273,6 +383,7 @@ Persistence:
 Side effects:
 
 - Sends an APNs pass update push for each registered device token.
+- Patches the Google Wallet object and posts an update message if the pass was saved to Google Wallet.
 
 ### `POST /api/admin/passes/:passId/updates`
 
@@ -302,6 +413,11 @@ Response:
     "attempted": true,
     "sent": 1,
     "failed": 0
+  },
+  "googleWallet": {
+    "attempted": true,
+    "sent": 1,
+    "failed": 0
   }
 }
 ```
@@ -314,6 +430,7 @@ Persistence:
 Side effects:
 
 - Sends an APNs pass update push for each registered device token.
+- Patches the Google Wallet object and posts an update message if the pass was saved to Google Wallet.
 
 ## Apple Wallet-Facing Endpoints
 

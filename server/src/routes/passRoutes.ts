@@ -3,8 +3,10 @@ import { z } from "zod";
 import { ContentProvider } from "../content/ContentProvider.js";
 import { PassService } from "../wallet/passService.js";
 import { PassSigningConfigurationError } from "../wallet/AppleSigningMaterial.js";
+import { GoogleWalletConfigurationError } from "../wallet/GoogleSigningMaterial.js";
+import { GoogleWalletPassService } from "../wallet/GoogleWalletPassService.js";
 import { WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
-import { PassPushNotificationService } from "../wallet/PassPushNotificationService.js";
+import { WalletUpdateService } from "../wallet/WalletUpdateService.js";
 
 const createPassSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -16,14 +18,15 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
   const router = Router();
   const passService = new PassService(contentProvider);
   const packageService = new WalletPassPackageService();
-  const pushService = new PassPushNotificationService(contentProvider);
+  const googleWalletService = new GoogleWalletPassService();
+  const updateService = new WalletUpdateService(contentProvider);
 
   router.post("/", async (request, response, next) => {
     try {
       const input = createPassSchema.parse(request.body);
 
       // Creating with an existing serial number updates that pass instead,
-      // pushing the new holder name to installed Wallet copies.
+      // pushing the new holder name to installed Apple and Google Wallet copies.
       if (input.serialNumber) {
         const existing = await contentProvider.getPassBySerialNumber(input.serialNumber);
         if (existing) {
@@ -31,13 +34,8 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
             firstName: input.firstName,
             lastName: input.lastName
           });
-          await pushService.notifyPassUpdated(pass);
-          response.status(200).json({
-            id: pass.id,
-            serialNumber: pass.serialNumber,
-            downloadUrl: passService.getDownloadUrl(pass.serialNumber),
-            updated: true
-          });
+          await updateService.notifyPassUpdated(pass);
+          response.status(200).json(passService.toCreatePassResponse(pass, true));
           return;
         }
       }
@@ -48,6 +46,7 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
     }
   });
 
+  // Apple Wallet: signed .pkpass package for PKAddPassesViewController.
   router.get("/:serialNumber/download", async (request, response, next) => {
     try {
       const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
@@ -70,6 +69,54 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
       if (error instanceof PassSigningConfigurationError) {
         response.status(503).json({
           message: "Apple Wallet pass signing is not configured.",
+          detail: error.message
+        });
+        return;
+      }
+
+      next(error);
+    }
+  });
+
+  // Google Wallet: signed Save to Google Wallet JWT for PayClient.savePassesJwt.
+  router.get("/:serialNumber/google-wallet", async (request, response, next) => {
+    try {
+      const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
+      if (!pass) {
+        response.sendStatus(404);
+        return;
+      }
+
+      response.set("Cache-Control", "no-store").json(await googleWalletService.createSavePayload(pass));
+    } catch (error) {
+      if (error instanceof GoogleWalletConfigurationError) {
+        response.status(503).json({
+          message: "Google Wallet is not configured.",
+          detail: error.message
+        });
+        return;
+      }
+
+      next(error);
+    }
+  });
+
+  // Google Wallet: shareable link. Redirects to pay.google.com so a recipient
+  // without the app can add the pass from any browser or Android device.
+  router.get("/:serialNumber/google-wallet/save", async (request, response, next) => {
+    try {
+      const pass = await contentProvider.getPassBySerialNumber(request.params.serialNumber);
+      if (!pass) {
+        response.sendStatus(404);
+        return;
+      }
+
+      const payload = await googleWalletService.createSavePayload(pass);
+      response.set("Cache-Control", "no-store").redirect(302, payload.saveUrl);
+    } catch (error) {
+      if (error instanceof GoogleWalletConfigurationError) {
+        response.status(503).json({
+          message: "Google Wallet is not configured.",
           detail: error.message
         });
         return;

@@ -3,7 +3,9 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { ContentProvider, WalletPass } from "../content/ContentProvider.js";
 import { logInfo } from "../logger.js";
-import { PassPushNotificationService } from "../wallet/PassPushNotificationService.js";
+import { GoogleWalletPassService } from "../wallet/GoogleWalletPassService.js";
+import { GoogleWalletConfigurationError, readGoogleSigningMaterial } from "../wallet/GoogleSigningMaterial.js";
+import { WalletUpdateService } from "../wallet/WalletUpdateService.js";
 
 const updateSchema = z.object({
   message: z.string().trim().min(1).max(240)
@@ -16,7 +18,8 @@ const updateNameSchema = z.object({
 
 export function createAdminRoutes(contentProvider: ContentProvider): Router {
   const router = Router();
-  const pushService = new PassPushNotificationService(contentProvider);
+  const updateService = new WalletUpdateService(contentProvider);
+  const googleWalletService = new GoogleWalletPassService();
 
   router.get("/passes", async (_request, response, next) => {
     try {
@@ -42,6 +45,7 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
         webServiceURL: config.publicApiBaseUrl,
         authenticationTokenConfigured: pass.appleAuthenticationToken.length > 0,
         authenticationTokenLength: pass.appleAuthenticationToken.length,
+        googleWallet: describeGoogleWallet(googleWalletService, pass.serialNumber),
         updatedAt: pass.updatedAt
       });
     } catch (error) {
@@ -55,9 +59,9 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
       logInfo("admin.pass_update.requested", { passId: request.params.passId });
       const update = await contentProvider.createPassUpdate(request.params.passId, input.message);
       const pass = await contentProvider.getPassById(request.params.passId);
-      const push = pass ? await pushService.notifyPassUpdated(pass) : undefined;
-      logInfo("admin.pass_update.complete", { passId: request.params.passId, push });
-      response.status(201).json({ update, push });
+      const results = pass ? await updateService.notifyPassUpdated(pass) : undefined;
+      logInfo("admin.pass_update.complete", { passId: request.params.passId, results });
+      response.status(201).json({ update, push: results?.apple, googleWallet: results?.google });
     } catch (error) {
       next(error);
     }
@@ -68,14 +72,14 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
       const input = updateNameSchema.parse(request.body);
       logInfo("admin.pass_name_update.requested", { passId: request.params.passId });
       const pass = await contentProvider.updatePassName(request.params.passId, input);
-      const push = await pushService.notifyPassUpdated(pass);
+      const results = await updateService.notifyPassUpdated(pass);
       logInfo("admin.pass_name_update.complete", {
         passId: pass.id,
         serialNumber: pass.serialNumber,
         updatedAt: pass.updatedAt,
-        push
+        results
       });
-      response.json({ pass: toAdminPass(pass), push });
+      response.json({ pass: toAdminPass(pass), push: results.apple, googleWallet: results.google });
     } catch (error) {
       next(error);
     }
@@ -87,4 +91,21 @@ export function createAdminRoutes(contentProvider: ContentProvider): Router {
 function toAdminPass(pass: WalletPass): Omit<WalletPass, "appleAuthenticationToken"> {
   const { appleAuthenticationToken: _appleAuthenticationToken, ...adminPass } = pass;
   return adminPass;
+}
+
+function describeGoogleWallet(service: GoogleWalletPassService, serialNumber: string) {
+  try {
+    const material = readGoogleSigningMaterial();
+    return {
+      configured: true,
+      issuerId: material.issuerId,
+      classId: material.classId,
+      objectId: service.getObjectId(serialNumber, material)
+    };
+  } catch (error) {
+    if (error instanceof GoogleWalletConfigurationError) {
+      return { configured: false, detail: error.message };
+    }
+    throw error;
+  }
 }

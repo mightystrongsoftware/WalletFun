@@ -12,6 +12,20 @@ node_modules/
 *.provisionprofile
 *.pkpass
 
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/local.properties
+android/**/build/
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# Google Wallet service accounts
+*service-account*.json
+
 # Apple / Xcode
 build/
 DerivedData/

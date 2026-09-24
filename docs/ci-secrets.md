@@ -25,7 +25,7 @@ The deploy workflow skips API or web deployment when the corresponding secrets a
 
 ## Host-Level Environment Variables
 
-Do not put Supabase service keys or Apple Wallet signing materials in GitHub Actions unless a workflow truly needs them.
+Do not put Supabase service keys, Apple Wallet signing materials, or the Google Wallet service account key in GitHub Actions unless a workflow truly needs them. The Android CI job only builds an unsigned debug APK and needs no secrets.
 
 For this prototype, store these directly in Render:
 
@@ -35,6 +35,8 @@ PUBLIC_API_BASE_URL=https://<your-render-service>.onrender.com
 WEB_ORIGIN=https://<your-vercel-admin>.vercel.app
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>
+GOOGLE_WALLET_ISSUER_ID=<your-google-wallet-issuer-id>
+GOOGLE_SERVICE_ACCOUNT_PATH=/etc/secrets/google-wallet-service-account.json
 ```
 
 Store `VITE_WALLETFUN_API_BASE_URL` in Vercel and GitHub Actions.

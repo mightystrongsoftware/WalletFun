@@ -12,7 +12,13 @@ export interface CreatePassRequest {
 export interface CreatePassResponse {
   id: string;
   serialNumber: string;
+  /** Signed `.pkpass` for Apple Wallet (iOS app). */
   downloadUrl: string;
+  /** JSON endpoint returning the Save to Google Wallet JWT (Android app). */
+  googleWalletUrl: string;
+  /** Shareable link that redirects to the Google Wallet save flow. */
+  googleWalletSaveUrl: string;
+  updated?: boolean;
 }
 
 export class PassService {
@@ -33,11 +39,22 @@ export class PassService {
     return `${config.publicApiBaseUrl}/api/passes/${serialNumber}/download`;
   }
 
-  private toCreatePassResponse(pass: WalletPass): CreatePassResponse {
+  getGoogleWalletUrl(serialNumber: string): string {
+    return `${config.publicApiBaseUrl}/api/passes/${serialNumber}/google-wallet`;
+  }
+
+  getGoogleWalletSaveUrl(serialNumber: string): string {
+    return `${this.getGoogleWalletUrl(serialNumber)}/save`;
+  }
+
+  toCreatePassResponse(pass: WalletPass, updated?: boolean): CreatePassResponse {
     return {
       id: pass.id,
       serialNumber: pass.serialNumber,
-      downloadUrl: this.getDownloadUrl(pass.serialNumber)
+      downloadUrl: this.getDownloadUrl(pass.serialNumber),
+      googleWalletUrl: this.getGoogleWalletUrl(pass.serialNumber),
+      googleWalletSaveUrl: this.getGoogleWalletSaveUrl(pass.serialNumber),
+      ...(updated === undefined ? {} : { updated })
     };
   }
 }
