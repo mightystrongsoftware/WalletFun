@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
+import { NextFunction, Response } from "express";
 import { ContentProvider } from "../content/ContentProvider.js";
 import { PassService } from "../wallet/passService.js";
 import { PassSigningConfigurationError } from "../wallet/AppleSigningMaterial.js";
 import { GoogleWalletConfigurationError } from "../wallet/GoogleSigningMaterial.js";
-import { GoogleWalletPassService } from "../wallet/GoogleWalletPassService.js";
+import { GoogleWalletApiError, GoogleWalletPassService } from "../wallet/GoogleWalletPassService.js";
 import { WalletPassPackageService } from "../wallet/WalletPassPackageService.js";
 import { WalletUpdateService } from "../wallet/WalletUpdateService.js";
 
@@ -89,15 +90,7 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
 
       response.set("Cache-Control", "no-store").json(await googleWalletService.createSavePayload(pass));
     } catch (error) {
-      if (error instanceof GoogleWalletConfigurationError) {
-        response.status(503).json({
-          message: "Google Wallet is not configured.",
-          detail: error.message
-        });
-        return;
-      }
-
-      next(error);
+      handleGoogleWalletError(error, response, next);
     }
   });
 
@@ -114,17 +107,24 @@ export function createPassRoutes(contentProvider: ContentProvider): Router {
       const payload = await googleWalletService.createSavePayload(pass);
       response.set("Cache-Control", "no-store").redirect(302, payload.saveUrl);
     } catch (error) {
-      if (error instanceof GoogleWalletConfigurationError) {
-        response.status(503).json({
-          message: "Google Wallet is not configured.",
-          detail: error.message
-        });
-        return;
-      }
-
-      next(error);
+      handleGoogleWalletError(error, response, next);
     }
   });
 
   return router;
+}
+
+/** 503 when our Google settings are missing or unreadable, 502 when Google rejects the request. */
+function handleGoogleWalletError(error: unknown, response: Response, next: NextFunction): void {
+  if (error instanceof GoogleWalletConfigurationError) {
+    response.status(503).json({ message: "Google Wallet is not configured.", detail: error.message });
+    return;
+  }
+
+  if (error instanceof GoogleWalletApiError) {
+    response.status(502).json({ message: "Google Wallet API request failed.", detail: error.message });
+    return;
+  }
+
+  next(error);
 }

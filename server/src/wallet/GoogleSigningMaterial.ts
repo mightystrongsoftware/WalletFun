@@ -46,11 +46,22 @@ export function readGoogleSigningMaterial(): GoogleSigningMaterial {
   };
 }
 
+function readServiceAccountFile(path: string): string {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    // A wrong path or an unmounted secret file is a deployment mistake, so
+    // report it as configuration rather than an opaque 500.
+    const code = (error as NodeJS.ErrnoException).code ?? "unknown error";
+    throw new GoogleWalletConfigurationError(`Could not read GOOGLE_SERVICE_ACCOUNT_PATH (${path}): ${code}.`);
+  }
+}
+
 function readServiceAccount(): ServiceAccountCredentials {
   const raw = config.googleServiceAccountJson
     ? config.googleServiceAccountJson
     : config.googleServiceAccountPath
-      ? readFileSync(config.googleServiceAccountPath, "utf8")
+      ? readServiceAccountFile(config.googleServiceAccountPath)
       : undefined;
 
   if (!raw) {

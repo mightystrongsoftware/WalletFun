@@ -57,8 +57,11 @@ class WalletFunApiClient(
         }
 
     private fun errorFrom(payload: String): WalletFunApiException {
-        val message = runCatching { json.decodeFromString<ApiErrorResponse>(payload).message }.getOrNull()
-        return if (message.isNullOrBlank()) WalletFunApiException.RequestFailed else WalletFunApiException.ServerMessage(message)
+        // The server pairs a short message with a detail explaining the cause
+        // (e.g. which Google Wallet setting is missing); show both.
+        val error = runCatching { json.decodeFromString<ApiErrorResponse>(payload) }.getOrNull()
+        val message = listOfNotNull(error?.message, error?.detail).filter { it.isNotBlank() }.joinToString(" ")
+        return if (message.isBlank()) WalletFunApiException.RequestFailed else WalletFunApiException.ServerMessage(message)
     }
 
     private companion object {
@@ -94,7 +97,7 @@ data class GoogleWalletSavePayload(
 )
 
 @Serializable
-private data class ApiErrorResponse(val message: String)
+private data class ApiErrorResponse(val message: String? = null, val detail: String? = null)
 
 sealed class WalletFunApiException(message: String) : IOException(message) {
     data object RequestFailed : WalletFunApiException("The WalletFun server returned an error.") {

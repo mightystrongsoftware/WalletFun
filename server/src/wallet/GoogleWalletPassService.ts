@@ -9,6 +9,12 @@ const WALLET_OBJECTS_API = "https://walletobjects.googleapis.com/walletobjects/v
 const WALLET_OBJECTS_SCOPE = "https://www.googleapis.com/auth/wallet_object.issuer";
 const SAVE_URL_PREFIX = "https://pay.google.com/gp/v/save/";
 
+/**
+ * Google rejected or failed a Wallet Objects / OAuth request, for example
+ * because the service account was not added to the issuer account.
+ */
+export class GoogleWalletApiError extends Error {}
+
 export interface GoogleWalletSavePayload {
   objectId: string;
   saveJwt: string;
@@ -67,8 +73,18 @@ export class GoogleWalletPassService {
     const client = this.createApiClient(material);
     const objectId = this.getObjectId(pass.serialNumber, material);
 
-    await this.ensureClass(client, material);
-    await this.upsertObject(client, material, pass);
+    try {
+      await this.ensureClass(client, material);
+      await this.upsertObject(client, material, pass);
+    } catch (error) {
+      logError("google_wallet.save_payload.error", {
+        passId: pass.id,
+        serialNumber: pass.serialNumber,
+        objectId,
+        error: describeError(error)
+      });
+      throw new GoogleWalletApiError(summarizeError(error));
+    }
 
     const saveJwt = signSaveJwt(material, objectId);
     logInfo("google_wallet.save_payload.created", {
@@ -279,6 +295,22 @@ interface HttpError {
 /** Errors thrown by google-auth-library requests carry the HTTP response. */
 function isHttpError(error: unknown): error is HttpError {
   return error instanceof Error && typeof (error as HttpError).response === "object";
+}
+
+/** Short, client-safe reason: HTTP status plus Google's own error message. */
+function summarizeError(error: unknown): string {
+  if (isHttpError(error)) {
+    const data = error.response?.data as
+      | { error?: { message?: string } | string; error_description?: string }
+      | undefined;
+    const reason =
+      (typeof data?.error === "object" ? data.error?.message : undefined) ??
+      data?.error_description ??
+      (typeof data?.error === "string" ? data.error : undefined) ??
+      error.message;
+    return `${error.response?.status ?? "No response"}: ${reason}`;
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 function describeError(error: unknown): string {
