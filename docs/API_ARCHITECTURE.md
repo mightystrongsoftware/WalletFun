@@ -35,7 +35,8 @@ WalletFun has one public server backend. The iOS app, Android app, Web Admin, an
 | iOS app | `GET /api/passes/:serialNumber/download` | Client to server | Public HTTPS download URL. Pass package itself is Apple-signed. | No requester authentication. Any party with the serial number can request the `.pkpass`. | Add a short-lived download token or require authenticated app session. Avoid exposing predictable serials. |
 | Android app | `POST /api/passes` | Client to server | Same public endpoint and validation as the iOS app. | No user authentication. | Same as the iOS row. |
 | Android app | `GET /api/passes/:serialNumber/google-wallet` | Client to server | Public HTTPS endpoint. Returned JWT is RS256-signed by the Google service account and only references the object id. | No requester authentication. Any party with the serial number can obtain a save JWT and add the pass to their own Google Wallet. Google allows one save per object per account. | Add a short-lived token or authenticated app session. Consider `exp` on the JWT. |
-| Android app / share recipients | `GET /api/passes/:serialNumber/google-wallet/save` | Client to server | Public HTTPS redirect into `https://pay.google.com/gp/v/save/<jwt>`. | Bearer-by-knowledge of the serial number, same as the Apple download link. | Same as above. |
+| Google Wallet pass holders ("Share this pass" link on the card) | `GET /api/passes/:serialNumber/google-wallet/save` | Client to server | Public HTTPS redirect into `https://pay.google.com/gp/v/save/<jwt>`. | Bearer-by-knowledge of the serial number, same as the Apple download link. The serial is also printed on the card, so anyone who can see the pass can rebuild this URL. | Same as above. Replace the serial with a separate share token before relying on this for anything but public cards. |
+| Android app share recipients | `https://pay.google.com/gp/v/save/<jwt>` (shared directly) | Client to Google | The app shares the signed save link itself; no request touches our server. | The JWT is a non-expiring bearer credential signed by our service account. It cannot be revoked individually; only `exp` at signing time or deactivating the object stops it. We get no visibility into shares or saves. | Demo-only choice. Add `exp` to the JWT and move sharing back to a tokenized server link with a landing page. |
 | Web Admin | `GET /api/admin/passes` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. | No real admin authentication in the API. CORS only limits normal browser calls from other origins. | Add admin auth, such as Supabase Auth, Vercel-protected admin auth, or server-validated JWT with role checks. |
 | Web Admin | `GET /api/admin/passes/:passId/wallet-metadata` | Web admin to server | Browser HTTPS request restricted by configured CORS origin. Does not expose the pass auth token value. | Diagnostic endpoint has no server-side admin auth. | Put behind admin auth or remove before production if not needed. |
 | Web Admin | `PATCH /api/admin/passes/:passId/name` | Web admin to server | Browser HTTPS request restricted by configured CORS origin; body validation with Zod. | No real admin authentication. Triggers persisted mutation and APNs update push. | Require admin auth and authorization. Consider audit logs and rate limiting. |
@@ -142,6 +143,7 @@ Google Wallet has no inbound web service contract. The server owns the pass as a
 
 - The object id is `<issuerId>.<serialNumber>`, so serial numbers must stay within `[A-Za-z0-9._-]`, which the create schema already enforces.
 - `GET /api/passes/:serialNumber/google-wallet` ensures the class exists, inserts or replaces the object with the current pass state, then signs a skinny JWT that references the object id.
+- Every object carries a `linksModuleData` entry labelled "Share this pass" whose URI is `GET /api/passes/:serialNumber/google-wallet/save`. This is the only way to offer a share action inside Google Wallet, which has no native share for generic passes. Existing objects pick the link up on the next save-payload fetch (full PUT) or admin update (PATCH).
 - Updates call `PATCH genericObject/<id>` and `addMessage` with `TEXT_AND_NOTIFY`, the closest analogue to Apple's `changeMessage`. Google caps notifications at three per object per day, so a failed message is logged but does not fail the update.
 - If the object was never created (pass never saved to Google Wallet), the update is skipped with `skippedReason`.
 
@@ -251,18 +253,18 @@ Response:
 Side effects:
 
 - Creates the generic class `<issuerId>.<GOOGLE_WALLET_CLASS_SUFFIX>` on first use.
-- Inserts or replaces the generic object `<issuerId>.<serialNumber>` with the current holder name, status, serial, and latest update message.
+- Inserts or replaces the generic object `<issuerId>.<serialNumber>` with the current holder name, status, serial, latest update message, and the "Share this pass" link.
 
 Notes:
 
 - The Android app passes `saveJwt` to `PayClient.savePassesJwt`, the Google counterpart of `PKAddPassesViewController`.
-- `saveUrl` is the browser fallback for devices without Google Wallet.
+- `saveUrl` is the browser fallback for devices without Google Wallet, and is also the link the Android app shares. It is assembled per request from a fixed prefix and a freshly signed JWT, so two requests for the same pass yield different URLs that resolve to the same object.
 
 ### `GET /api/passes/:serialNumber/google-wallet/save`
 
-Redirects (`302`) to the `pay.google.com` save link for a pass. This is the link the Android app shares, mirroring how the iOS app shares the `.pkpass` download URL.
+Redirects (`302`) to the `pay.google.com` save link for a pass. Runs the same class and object upsert as `/google-wallet`, then redirects instead of returning JSON. This is the URI behind the "Share this pass" link on the Google Wallet card. The Android app previously shared this link and now shares `saveUrl` directly; `googleWalletSaveUrl` is still returned by `POST /api/passes` and kept on the Android `SavedPass` record so sharing can move back to a server-controlled link.
 
-Audience: Android app share recipients.
+Audience: Google Wallet pass holders tapping the on-card link, and any browser opening a shared link.
 
 Response:
 

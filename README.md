@@ -52,8 +52,9 @@ Google Wallet works differently from Apple Wallet: the pass lives as a Generic O
 1. The Android app calls `POST /api/passes` with first and last name (same endpoint as iOS).
 2. When the user taps Add to Google Wallet, the app calls `GET /api/passes/:serialNumber/google-wallet`. The server ensures the pass class and object exist in the Wallet Objects API and returns a signed Save to Google Wallet JWT.
 3. The app hands the JWT to the Google Pay `PayClient.savePassesJwt` API, which presents the Google Wallet add-pass sheet. Devices without Google Wallet fall back to the `https://pay.google.com/gp/v/save/...` link in a browser.
-4. Sharing sends `GET /api/passes/:serialNumber/google-wallet/save`, a short link that redirects into the same save flow.
-5. When the Web Admin, or a create request with an existing serial number, updates the pass, the server patches the Google Wallet object and posts an update message. Google refreshes every wallet holding the pass; no APNs-style push is needed.
+4. Sharing from the app sends the `https://pay.google.com/gp/v/save/<jwt>` link itself, so recipients land directly on Google's save page. The post-create sheet fetches the JWT on the first Add or Share tap and reuses it for the other action.
+5. The pass object also carries a "Share this pass" link (`GET /api/passes/:serialNumber/google-wallet/save`) in its links module. Google Wallet has no built-in share action for generic passes, so tapping that link from inside Wallet opens the save flow in a browser, where the holder can add the pass or share the page onward.
+6. When the Web Admin, or a create request with an existing serial number, updates the pass, the server patches the Google Wallet object and posts an update message. Google refreshes every wallet holding the pass; no APNs-style push is needed.
 
 Google Wallet has no API for apps to list saved passes, so the Android "Saved to Google Wallet" list is a local record of passes added from that device. Swiping a row away only forgets it locally; removing a pass from Google Wallet is done in the Wallet app.
 

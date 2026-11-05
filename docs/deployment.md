@@ -104,7 +104,7 @@ CI runs on pull requests and pushes to `main` for:
 - `server`: install, typecheck, build, audit
 - `web`: install, build, audit
 - `iOS`: Tuist generate and unsigned Xcode build
-- `android`: Gradle `assembleDebug` with Temurin JDK 17
+- `android`: Gradle `assembleDebug` with Temurin JDK 17; the unsigned debug APK is uploaded as the `walletfun-debug-apk` run artifact (90-day retention) and can be fetched with `gh run download <run-id> -n walletfun-debug-apk`
 
 Deployments run on pushes to `main` and manual workflow dispatch. See `docs/ci-secrets.md` for the required GitHub secrets.
 

@@ -40,6 +40,9 @@ flowchart LR
   API -->|"Signed Save to Google Wallet JWT"| ANDROID
   ANDROID -->|"Present save sheet"| PAYCLIENT
   PAYCLIENT --> GWALLET
+  ANDROID -->|"Share pay.google.com/gp/v/save/{jwt}\nvia Android share sheet"| GWALLET
+  GWALLET -->|"'Share this pass' card link\nGET /api/passes/{serial}/google-wallet/save"| API
+  API -->|"302 to fresh pay.google.com save link"| GWALLET
 
   WALLET -->|"Register for updates\nPOST /v1/devices/.../registrations/..."| API
   API -->|"Store deviceLibraryIdentifier + pushToken"| PROVIDER

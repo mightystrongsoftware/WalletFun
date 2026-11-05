@@ -103,15 +103,28 @@ sequenceDiagram
   API->>Objects: GET genericClass/{issuerId}.walletfun (insert if missing)
   API->>Objects: GET genericObject/{issuerId}.{serialNumber}
   Objects-->>API: 404 or existing object
-  API->>Objects: POST genericObject (or PUT to replace)
+  API->>Objects: POST genericObject (or PUT to replace), includes "Share this pass" link
   Objects-->>API: Object saved
-  API-->>Android: objectId, saveJwt, saveUrl
+  API->>API: Sign skinny JWT referencing objectId
+  API-->>Android: objectId, saveJwt, saveUrl (pay.google.com/gp/v/save/<jwt>)
 
   Android->>Pay: savePassesJwt(saveJwt)
   Pay->>GWallet: Present save sheet
   User->>GWallet: Confirm
   GWallet-->>Android: RESULT_OK via onActivityResult
-  Android->>Android: Record pass in local saved list
+  Android->>Android: Record pass in local saved list (keeps saveUrl)
+
+  User->>Android: Tap Share (post-create sheet or saved-pass row)
+  Android->>Android: Reuse fetched payload, or GET /api/passes/{serialNumber}/google-wallet first
+  Android->>User: Android share sheet with saveUrl as plain text
+  Note over User,GWallet: Recipient opens saveUrl; Google verifies the JWT signature and shows the same object
+
+  User->>GWallet: Tap "Share this pass" link on the card
+  GWallet->>API: Browser opens GET /api/passes/{serialNumber}/google-wallet/save
+  API->>Objects: Same class and object upsert as above
+  API->>API: Sign a fresh JWT
+  API-->>GWallet: 302 to pay.google.com/gp/v/save/<jwt>
+  Note over GWallet: Holder can add the pass or share the page from the browser
 
   Admin->>API: PATCH /api/admin/passes/{passId}/name
   API->>Provider: updatePassName(passId, firstName, lastName)
