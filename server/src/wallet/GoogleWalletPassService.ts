@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { WalletPass } from "../content/ContentProvider.js";
 import { logError, logInfo, logWarn } from "../logger.js";
 import { GoogleSigningMaterial, GoogleWalletConfigurationError, readGoogleSigningMaterial } from "./GoogleSigningMaterial.js";
+import { getGoogleWalletSaveUrl } from "./passService.js";
 
 const WALLET_OBJECTS_API = "https://walletobjects.googleapis.com/walletobjects/v1";
 const WALLET_OBJECTS_SCOPE = "https://www.googleapis.com/auth/wallet_object.issuer";
@@ -42,6 +43,7 @@ interface GenericObject {
   hexBackgroundColor: string;
   barcode: { type: "QR_CODE"; value: string; alternateText: string };
   textModulesData: Array<{ id: string; header: string; body: string }>;
+  linksModuleData: { uris: Array<{ id: string; uri: string; description: string }> };
 }
 
 /**
@@ -256,7 +258,13 @@ export class GoogleWalletPassService {
         { id: "status", header: "STATUS", body: pass.status.toUpperCase() },
         { id: "serial", header: "SERIAL", body: pass.serialNumber },
         { id: "updateMessage", header: "Latest Update", body: pass.updateMessage ?? "No updates yet." }
-      ]
+      ],
+      // Google Wallet has no built-in share action for generic passes, so the
+      // card carries its own link. Tapping it opens the save flow in a browser,
+      // where the holder can add the pass or share the page onward.
+      linksModuleData: {
+        uris: [{ id: "share", uri: getGoogleWalletSaveUrl(pass.serialNumber), description: "Share this pass" }]
+      }
     };
   }
 }

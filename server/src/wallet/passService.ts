@@ -44,7 +44,7 @@ export class PassService {
   }
 
   getGoogleWalletSaveUrl(serialNumber: string): string {
-    return `${this.getGoogleWalletUrl(serialNumber)}/save`;
+    return getGoogleWalletSaveUrl(serialNumber);
   }
 
   toCreatePassResponse(pass: WalletPass, updated?: boolean): CreatePassResponse {
@@ -57,4 +57,9 @@ export class PassService {
       ...(updated === undefined ? {} : { updated })
     };
   }
+}
+
+/** Shareable link that redirects into the Google Wallet save flow. Also placed on the pass itself. */
+export function getGoogleWalletSaveUrl(serialNumber: string): string {
+  return `${config.publicApiBaseUrl}/api/passes/${serialNumber}/google-wallet/save`;
 }
