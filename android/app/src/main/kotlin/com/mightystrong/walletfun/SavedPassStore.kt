@@ -16,7 +16,7 @@ data class SavedPass(
     val holderName: String,
     /** Direct pay.google.com link with the signed JWT; opens the pass in Google Wallet. */
     val saveUrl: String,
-    /** Short server link that redirects into the save flow; used for sharing. */
+    /** Short server link that redirects into the save flow. Kept for when sharing moves back to tokenized links. */
     val googleWalletSaveUrl: String,
     val savedAt: Long
 )

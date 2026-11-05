@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mightystrong.walletfun.CreatePassResponse
 import com.mightystrong.walletfun.GoogleWalletClient
+import com.mightystrong.walletfun.GoogleWalletSavePayload
 import com.mightystrong.walletfun.R
 import com.mightystrong.walletfun.SavedPass
 import com.mightystrong.walletfun.SavedPassStore
@@ -45,9 +46,10 @@ import com.mightystrong.walletfun.WalletFunApiClient
 import kotlinx.coroutines.launch
 
 /**
- * Sheet shown after a pass is created or updated. The Google Wallet JWT is only
- * fetched from the API when the user chooses to add the pass; sharing sends the
- * server's save link instead.
+ * Sheet shown after a pass is created or updated. The Google Wallet JWT is
+ * fetched from the API on demand, when the user first adds or shares the pass,
+ * and reused for the other action. Sharing sends the pay.google.com save link
+ * so recipients land directly on Google's save page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,13 +67,35 @@ fun PassActionsSheet(
 
     var statusMessage by rememberSaveable { mutableStateOf("") }
     var isAdding by remember { mutableStateOf(false) }
+    var isSharing by remember { mutableStateOf(false) }
+    var cachedPayload by remember { mutableStateOf<GoogleWalletSavePayload?>(null) }
+
+    suspend fun loadPayload(): GoogleWalletSavePayload =
+        cachedPayload ?: apiClient.fetchGoogleWalletPass(response.googleWalletUrl).also { cachedPayload = it }
+
+    fun shareGoogleWalletLink() {
+        scope.launch {
+            isSharing = true
+            statusMessage = ""
+            try {
+                shareWalletFunLink(context, loadPayload().saveUrl)
+            } catch (error: Exception) {
+                statusMessage = context.getString(
+                    R.string.status_fetch_failed,
+                    error.message ?: context.getString(R.string.error_request_failed)
+                )
+            } finally {
+                isSharing = false
+            }
+        }
+    }
 
     fun addToGoogleWallet() {
         scope.launch {
             isAdding = true
             statusMessage = ""
             try {
-                val payload = apiClient.fetchGoogleWalletPass(response.googleWalletUrl)
+                val payload = loadPayload()
 
                 if (!googleWalletClient.canSavePasses()) {
                     // Google's recommended fallback: the same JWT works as a
@@ -164,12 +188,17 @@ fun PassActionsSheet(
                 }
 
                 OutlinedButton(
-                    onClick = { shareWalletFunLink(context, response.googleWalletSaveUrl) },
+                    onClick = ::shareGoogleWalletLink,
+                    enabled = !isSharing,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null)
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.action_share_pass))
+                    if (isSharing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Share, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.action_share_pass))
+                    }
                 }
             }
 

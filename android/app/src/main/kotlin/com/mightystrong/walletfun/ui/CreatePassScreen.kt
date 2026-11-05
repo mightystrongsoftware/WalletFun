@@ -198,7 +198,7 @@ fun CreatePassScreen(
                             SavedPassRow(
                                 pass = pass,
                                 onOpen = { openLink(context, pass.saveUrl) },
-                                onShare = { shareWalletFunLink(context, pass.googleWalletSaveUrl) },
+                                onShare = { shareWalletFunLink(context, pass.saveUrl) },
                                 onForget = { savedPassStore.remove(pass.serialNumber) }
                             )
                             if (index < savedPasses.lastIndex) HorizontalDivider()
