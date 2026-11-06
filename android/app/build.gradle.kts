@@ -18,8 +18,8 @@ android {
         applicationId = "com.mightystrong.walletfun"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         // Same role as WALLETFUN_API_BASE_URL in the iOS Info.plist.
         buildConfigField("String", "WALLETFUN_API_BASE_URL", "\"$walletFunApiBaseUrl\"")

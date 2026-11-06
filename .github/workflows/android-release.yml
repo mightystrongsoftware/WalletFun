@@ -1,0 +1,98 @@
+name: Android Release
+
+# Publishes a debug APK to GitHub Releases. Tag a commit `android-v<versionName>`
+# and push the tag; the workflow builds that commit and creates (or refreshes)
+# the matching release. Re-run for an existing tag with workflow_dispatch.
+on:
+  push:
+    tags:
+      - "android-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing android-v* tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish debug APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug app
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Prepare release asset and notes
+        id: asset
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#android-v}"
+          gradle_version=$(sed -n 's/^[[:space:]]*versionName = "\(.*\)"/\1/p' app/build.gradle.kts)
+          if [ "$version" != "$gradle_version" ]; then
+            echo "Tag version $version does not match versionName $gradle_version in app/build.gradle.kts" >&2
+            exit 1
+          fi
+          min_sdk=$(sed -n 's/^[[:space:]]*minSdk = \([0-9]*\)/\1/p' app/build.gradle.kts)
+          api_url=$(sed -n 's/^walletFunApiBaseUrl=//p' gradle.properties)
+          apk="WalletFun-debug-${version}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$apk"
+          sha=$(sha256sum "$apk" | cut -d' ' -f1)
+          short_sha=$(git rev-parse --short HEAD)
+
+          cat > release-notes.md <<EOF
+          Debug build of the WalletFun Android app for testing.
+
+          - Points at the API at ${api_url}
+          - Signed with the Android debug keystore; enable "Install unknown apps" to install
+          - Requires Android API ${min_sdk} or newer
+          - Built from commit ${short_sha}
+
+          SHA-256: ${sha}
+          EOF
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "apk=$apk"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.asset.outputs.tag }}
+          VERSION: ${{ steps.asset.outputs.version }}
+          APK: ${{ steps.asset.outputs.apk }}
+        run: |
+          set -euo pipefail
+          title="WalletFun Android ${VERSION} (debug)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+            gh release edit "$TAG" --title "$title" --notes-file release-notes.md
+          else
+            gh release create "$TAG" "$APK" --verify-tag --title "$title" --notes-file release-notes.md
+          fi
